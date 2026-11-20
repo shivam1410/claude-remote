@@ -11,6 +11,7 @@
     "test": "node --test test/*.test.mjs",
     "doctor": "node src/service/doctor.mjs",
     "login": "node src/service/auth.mjs --login",
-    "start": "node src/service/index.mjs"
+    "start": "node src/service/index.mjs",
+    "rules-check": "node src/service/rules-check.mjs"
   }
 }

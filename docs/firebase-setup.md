@@ -102,3 +102,16 @@ CLAUDE_BRIDGE_BROWSER=Firefox npm run login
 
 The value is whatever `open -a` accepts, for example `Firefox` or
 `"Google Chrome"`. The URL is also printed, so pasting it anywhere works too.
+
+## 8. Prove the rules actually deny
+
+```bash
+cd bridge && npm run rules-check
+```
+
+Seven probes that must be refused — another uid's data, the root, an
+out-of-schema subtree, a malformed node, an oversized blob — plus one control
+write to your own path that must succeed. The control matters: without it, a
+total outage would look like perfect security.
+
+Re-run it after any change to `firebase/database.rules.json`.

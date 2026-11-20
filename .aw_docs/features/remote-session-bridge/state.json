@@ -2,7 +2,7 @@
   "feature_slug": "remote-session-bridge",
   "stage": "build",
   "mode": "full",
-  "status": "phase_3_code_complete_awaiting_config",
+  "status": "phase_3_verified_live",
   "created_at": "2026-11-20",
   "artifacts": {
     "spec.md": "written",
@@ -74,7 +74,9 @@
     "Egress boundary: only a scrubbed summary, a random session id, a timestamp, and an FCM token ever leave the machine; everything else is ciphertext.",
     "nhi7 and nhi5 honoured: no long-lived service-account key on the laptop, and no Admin SDK privilege that would bypass database rules.",
     "AES-GCM is authenticated, so a forged reply cannot be decrypted and is discarded before reaching a session.",
-    "Rules pin reads and writes to the signed-in uid; encryption, not the rules, is the confidentiality control."
+    "Rules pin reads and writes to the signed-in uid; encryption, not the rules, is the confidentiality control.",
+    "Cross-uid read and write, root read, out-of-schema subtree, blob-less node, and oversized blob are all denied by the deployed rules, proven live with a valid token and a passing control probe (2026-11-20).",
+    "Identity Toolkit error paths no longer echo the request URL, which carried the Web API key as a query parameter."
   ],
   "validation_commands": [
     "cd bridge && node --test",
@@ -172,21 +174,26 @@
       "Phase 0 scaffold",
       "Phase 1 pure core + tests",
       "Phase 2 hook emitter + settings wiring",
-      "Phase 3 service code (rules, config, keychain, OAuth, RTDB REST, spool drain)"
+      "Phase 3 service code (rules, config, keychain, OAuth, RTDB REST, spool drain)",
+      "Phase 3 verified against the live project: auth, rules, publish, delete"
     ],
-    "next": "Fill ~/.claude-bridge/config.json, run auth.mjs --login, then verify an encrypted node appears",
+    "next": "Phase 4 QR pairing, then Phase 5.1 resume-vs-fork spike",
     "evidence": {
       "tests": "50/50 green via `node --test test/*.test.mjs` in bridge/",
       "live_hook_proof": "SessionStart and SessionEnd records spooled from a real `claude -p` run on 2026-11-20",
       "hook_latency_ms": "~45 per event, measured over 3 runs",
       "settings_backup": "~/.claude/settings.json.bak-20261120-101253",
-      "offline_pipeline_smoke": "fold -> summarise -> seal -> open round trip produced a 225-byte blob and a correct decrypted payload on 2026-11-20"
+      "offline_pipeline_smoke": "fold -> summarise -> seal -> open round trip produced a 225-byte blob and a correct decrypted payload on 2026-11-20",
+      "doctor": "all checks green incl. write/read/delete round trip through live rules, 2026-11-20",
+      "live_publish": "16 sessions published from the real spool; 13 remain, 3 SessionEnd nodes deleted as specified",
+      "decrypt_proof": "nodes read back from Firebase are opaque; decrypted locally with the Keychain shared key",
+      "rules_denial_proof": "npm run rules-check: 7 denial probes + 1 control, all as specified",
+      "uid": "EXAMPLEUID000000000000000000"
     },
     "open_decisions": [
       "R1 \u2014 Cloud Functions on Blaze vs Android foreground service",
       "R4 \u2014 resume-vs-fork spike at task 5.1"
-    ],
-    "not_verified": "No live Firebase call has been made: the project config is not filled in yet, so auth, rules, and database writes are unproven end to end."
+    ]
   },
-  "updated_at": "2026-11-20T13:38:22+0530"
+  "updated_at": "2026-11-20T14:02:13+0530"
 }
