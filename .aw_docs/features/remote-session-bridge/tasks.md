@@ -17,38 +17,38 @@ git repository).
 
 ## Phase 0 — Scaffold
 
-- [ ] 0.1 `git init`; add `.gitignore` covering `node_modules`, `*.apk`, local
+- [x] 0.1 `git init`; add `.gitignore` covering `node_modules`, `*.apk`, local
       config, and anything under `secrets/`.
-- [ ] 0.2 Create `bridge/`, `functions/`, `android/`, `firebase/`, `docs/`.
-- [ ] 0.3 `bridge/package.json` with `node --test` wired as the test script.
+- [x] 0.2 Create `bridge/`, `functions/`, `android/`, `firebase/`, `docs/`.
+- [x] 0.3 `bridge/package.json` with `node --test` wired as the test script.
 - [ ] Commit: `chore: scaffold remote-session-bridge`
 
 ## Phase 1 — Pure core, no network
 
 Highest-value phase: everything here is testable with no Firebase account.
 
-- [ ] 1.1 `bridge/src/core/crypto.mjs` — AES-256-GCM seal and open, 12-byte
+- [x] 1.1 `bridge/src/core/crypto.mjs` — AES-256-GCM seal and open, 12-byte
       random nonce, output `nonce || ciphertext || tag` base64.
-- [ ] 1.2 Test: round trip; a tampered byte must throw, not return plaintext.
-- [ ] 1.3 `bridge/src/core/scrub.mjs` — redact key prefixes, bearer tokens,
+- [x] 1.2 Test: round trip; a tampered byte must throw, not return plaintext.
+- [x] 1.3 `bridge/src/core/scrub.mjs` — redact key prefixes, bearer tokens,
       JWTs, AWS key ids, emails, long hex and base64 runs.
-- [ ] 1.4 Test: corpus message containing a fake key, a JWT, and an email emits
+- [x] 1.4 Test: corpus message containing a fake key, a JWT, and an email emits
       none of them.
-- [ ] 1.5 `bridge/src/core/summarise.mjs` — strip fenced code and tool output,
+- [x] 1.5 `bridge/src/core/summarise.mjs` — strip fenced code and tool output,
       first one or two sentences, cap 200 chars, then scrub.
-- [ ] 1.6 Test: a message that is mostly a code block yields prose, not code.
+- [x] 1.6 Test: a message that is mostly a code block yields prose, not code.
 - [ ] Validation: `cd bridge && node --test` — all green.
 - [ ] Commit: `feat: encrypted payload core with redaction`
 
 ## Phase 2 — Hook emitter
 
-- [ ] 2.1 `bridge/src/hooks/emit.mjs` — read the hook JSON on stdin, append one
+- [x] 2.1 `bridge/src/hooks/emit.mjs` — read the hook JSON on stdin, append one
       record to `~/.claude-bridge/spool/`, always `process.exit(0)`.
-- [ ] 2.2 Wrap every path in try/catch; a spool failure must still exit zero.
-- [ ] 2.3 Additive wiring into `~/.claude/settings.json` for `SessionStart`,
+- [x] 2.2 Wrap every path in try/catch; a spool failure must still exit zero.
+- [x] 2.3 Additive wiring into `~/.claude/settings.json` for `SessionStart`,
       `Notification`, `Stop`, `SessionEnd`. Back the file up first and preserve
       the existing AW telemetry and graphify entries.
-- [ ] 2.4 Verify: run a throwaway session; confirm spool records appear and the
+- [x] 2.4 Verify: run a throwaway session; confirm spool records appear and the
       existing hooks still fire.
 - [ ] Validation: stop nothing, disable the network, run a session start to
       finish with no error and no perceptible delay.
