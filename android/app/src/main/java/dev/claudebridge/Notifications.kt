@@ -47,6 +47,8 @@ object Notifications {
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
+            // Claude's coral tints the small icon and the action label.
+            .setColor(0xFFD97757.toInt())
             .setContentTitle(title)
             .setContentText(session.summary.ifEmpty { session.state })
             .setStyle(NotificationCompat.BigTextStyle().bigText(session.summary))

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -450,6 +451,12 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit) {
                             )
                         }
                     },
+                    // Claude's own coral, so the handoff reads as "this goes to
+                    // Claude" rather than a generic app button.
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ClaudeOrange,
+                        contentColor = Color.White,
+                    ),
                 ) {
                     Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
@@ -529,6 +536,9 @@ private fun StateTag(state: String) {
             .padding(horizontal = 8.dp, vertical = 3.dp),
     )
 }
+
+/** Claude's brand coral, for anything that hands off to the Claude app. */
+val ClaudeOrange = Color(0xFFD97757)
 
 private fun stateLabel(state: String): String = when (state) {
     "waiting_input" -> "Needs input"
