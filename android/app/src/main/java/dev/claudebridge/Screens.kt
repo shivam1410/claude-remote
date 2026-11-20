@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.Button
@@ -59,6 +58,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
@@ -458,7 +458,11 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit) {
                         contentColor = Color.White,
                     ),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
+                    Icon(
+                        painterResource(R.drawable.ic_claude),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
                     Spacer(Modifier.width(8.dp))
                     Text("Open in Claude to reply")
                 }

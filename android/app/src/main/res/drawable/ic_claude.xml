@@ -1,0 +1,17 @@
+<!--
+  Claude's sunburst mark, for the "Open in Claude" handoff. Monochrome so it
+  tints to the button's content colour (white on the coral). Twelve rounded
+  rays; a stroked path rather than fills keeps it crisp at button size.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.9"
+        android:strokeLineCap="round"
+        android:pathData="M12.00,8.60L12.00,1.80M13.70,9.06L17.10,3.17M14.94,10.30L20.83,6.90M15.40,12.00L22.20,12.00M14.94,13.70L20.83,17.10M13.70,14.94L17.10,20.83M12.00,15.40L12.00,22.20M10.30,14.94L6.90,20.83M9.06,13.70L3.17,17.10M8.60,12.00L1.80,12.00M9.06,10.30L3.17,6.90M10.30,9.06L6.90,3.17" />
+</vector>

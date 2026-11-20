@@ -68,7 +68,7 @@ object Notifications {
                     .putExtra(OpenUrlActivity.EXTRA_NOTIFICATION_ID, notificationId),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            builder.addAction(0, "Open in Claude", open)
+            builder.addAction(R.drawable.ic_claude, "Open in Claude", open)
         }
 
         val notification = builder.build()
