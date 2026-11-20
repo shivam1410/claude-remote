@@ -1,6 +1,7 @@
 package dev.claudebridge
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
@@ -18,6 +19,9 @@ import kotlinx.coroutines.tasks.await
  * list with no explanation. Here it fails loudly instead.
  */
 object Auth {
+    private const val PREFS = "claude-bridge"
+    private const val KEY_PHOTO = "accountPhotoUrl"
+
 
     /** True once Firebase has a config — that is, once google-services.json exists. */
     fun configured(context: Context): Boolean = FirebaseApp.getApps(context).isNotEmpty()
@@ -26,9 +30,23 @@ object Auth {
 
     fun email(): String? = runCatching { FirebaseAuth.getInstance().currentUser?.email }.getOrNull()
 
-    /** The Google account photo, when there is one. Null is normal, not an error. */
-    fun photoUrl(): String? =
-        runCatching { FirebaseAuth.getInstance().currentUser?.photoUrl?.toString() }.getOrNull()
+    /**
+     * The Google account photo.
+     *
+     * Firebase only carries a photo URL when the ID token happened to include
+     * a picture claim, which it often does not. The Credential Manager
+     * response always has one, so that is captured at sign-in and used as the
+     * fallback. Null is still normal — some accounts have no photo at all.
+     */
+    fun photoUrl(context: Context): String? {
+        val fromFirebase = runCatching {
+            FirebaseAuth.getInstance().currentUser?.photoUrl?.toString()
+        }.getOrNull()
+        if (!fromFirebase.isNullOrEmpty()) return fromFirebase
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_PHOTO, null)
+            ?.takeIf { it.isNotEmpty() }
+    }
 
     /**
      * The OAuth web client id the google-services plugin writes into resources.
@@ -66,7 +84,12 @@ object Auth {
                 .build()
 
             val response = CredentialManager.create(context).getCredential(context, request)
-            val token = GoogleIdTokenCredential.createFrom(response.credential.data).idToken
+            val google = GoogleIdTokenCredential.createFrom(response.credential.data)
+            val token = google.idToken
+            google.profilePictureUri?.toString()?.let { photo ->
+                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit { putString(KEY_PHOTO, photo) }
+            }
             val user = FirebaseAuth.getInstance()
                 .signInWithCredential(GoogleAuthProvider.getCredential(token, null))
                 .await()
@@ -81,5 +104,8 @@ object Auth {
         }
     }
 
-    fun signOut() = runCatching { FirebaseAuth.getInstance().signOut() }
+    fun signOut(context: Context) = runCatching {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { remove(KEY_PHOTO) }
+        FirebaseAuth.getInstance().signOut()
+    }
 }

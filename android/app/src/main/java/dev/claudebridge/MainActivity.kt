@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -162,6 +163,12 @@ fun BridgeApp(initialSessionId: String?) {
     val approvals by repo.approvals.collectAsStateWithLifecycle(emptyList())
 
     val open = sessions.firstOrNull { it.sessionId == selected }
+
+    // The detail view is state in one Activity, not a second Activity, so
+    // without this the system back gesture leaves the app entirely instead of
+    // returning to the list.
+    BackHandler(enabled = open != null) { selected = null }
+
     if (open != null) {
         SessionDetailScreen(
             session = open,
@@ -179,7 +186,7 @@ fun BridgeApp(initialSessionId: String?) {
             onUnpair = {
                 Devices.unregister(context)
                 Paired.clear(context)
-                Auth.signOut()
+                Auth.signOut(context)
                 signedIn = false
                 paired = false
                 selected = null
@@ -188,7 +195,7 @@ fun BridgeApp(initialSessionId: String?) {
             onCheckUpdate = { Updater.check(context, manual = true) },
             onInstallUpdate = { Updater.install(context) },
             accountEmail = Auth.email(),
-            accountPhotoUrl = Auth.photoUrl(),
+            accountPhotoUrl = Auth.photoUrl(context),
         )
     }
 }

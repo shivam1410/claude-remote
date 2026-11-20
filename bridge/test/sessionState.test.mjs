@@ -92,3 +92,19 @@ test('pushes on a first sighting that already needs the user', () => {
 test('push states are exactly the ones D10 names', () => {
   assert.deepEqual([...PUSH_STATES].sort(), ['done', 'error', 'waiting_approval', 'waiting_input']);
 });
+
+test('projectLabel names the repository, not the subdirectory you happen to be in', () => {
+  // A session working in a subdirectory was labelled by that subdirectory —
+  // "android" instead of the project — which is useless on a phone listing
+  // several sessions at once.
+  const isRepoRoot = (dir) => dir === '/Users/me/code/my-project';
+  assert.equal(projectLabel('/Users/me/code/my-project/android/app', isRepoRoot), 'my-project');
+  assert.equal(projectLabel('/Users/me/code/my-project', isRepoRoot), 'my-project');
+});
+
+test('projectLabel falls back to the leaf outside a repository', () => {
+  const never = () => false;
+  assert.equal(projectLabel('/tmp/scratch/deep', never), 'deep');
+  assert.equal(projectLabel('', never), 'unknown');
+  assert.equal(projectLabel(undefined, never), 'unknown');
+});

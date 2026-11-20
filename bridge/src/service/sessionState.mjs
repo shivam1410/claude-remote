@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 // Pure mapping from spooled hook events to the one-line session view the phone
 // sees. No I/O, so it is fully testable offline.
 //
@@ -28,10 +30,28 @@ export function stateForEvent(record) {
 }
 
 /** The short project label shown on the phone: the working directory's name. */
-export function projectLabel(cwd) {
+export function projectLabel(cwd, isRepoRoot = defaultIsRepoRoot) {
   if (typeof cwd !== 'string' || cwd === '') return 'unknown';
   const parts = cwd.replace(/\/+$/, '').split('/').filter(Boolean);
-  return parts[parts.length - 1] ?? 'unknown';
+  if (parts.length === 0) return 'unknown';
+
+  // Walk up to the repository root. A session whose cwd is a subdirectory
+  // would otherwise be labelled by that subdirectory — "android" rather than
+  // the project it belongs to, which is useless on a phone showing several
+  // sessions at once.
+  for (let i = parts.length; i > 0; i -= 1) {
+    if (isRepoRoot(`/${parts.slice(0, i).join('/')}`)) return parts[i - 1];
+  }
+  return parts[parts.length - 1];
+}
+
+function defaultIsRepoRoot(dir) {
+  try {
+    return existsSync(join(dir, '.git'));
+  } catch {
+    // Unreadable path: fall back to the leaf name rather than failing.
+    return false;
+  }
 }
 
 /**
