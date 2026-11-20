@@ -95,6 +95,9 @@ dependencies {
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    // One avatar. Coil rather than hand-rolled loading, for the caching and
+    // lifecycle handling that a rolled-by-hand version always gets wrong.
+    implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     // Task.await() for the Firebase SDKs.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")

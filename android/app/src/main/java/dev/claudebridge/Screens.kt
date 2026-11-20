@@ -13,10 +13,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +37,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,6 +57,97 @@ import java.util.Date
  * someone sits when a build is broken, and that is when they most need to pull
  * a newer one.
  */
+/**
+ * The avatar in the top bar, and everything behind it.
+ *
+ * Update status and unpairing both live here rather than in the session list:
+ * the list is for sessions, and a line reading "Up to date" among them is
+ * noise at exactly the moment you are looking for something else.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AccountMenu(
+    email: String?,
+    photoUrl: String?,
+    updateState: UpdateState,
+    onCheckUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
+    onUnpair: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+
+    IconButton(onClick = { open = true }) {
+        if (photoUrl != null) {
+            AsyncImage(
+                model = photoUrl,
+                contentDescription = "Account",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(32.dp).clip(CircleShape),
+                // Shown while loading and if the photo cannot be fetched, so
+                // a slow or blocked image never leaves an empty button.
+                placeholder = rememberVectorPainter(Icons.Filled.AccountCircle),
+                error = rememberVectorPainter(Icons.Filled.AccountCircle),
+            )
+        } else {
+            Icon(Icons.Filled.AccountCircle, contentDescription = "Account", modifier = Modifier.size(32.dp))
+        }
+    }
+
+    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        if (email != null) {
+            Text(
+                email,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            HorizontalDivider()
+        }
+
+        DropdownMenuItem(
+            text = { Text("Version ${BuildConfig.VERSION_NAME}") },
+            onClick = {},
+            enabled = false,
+        )
+
+        when (updateState) {
+            is UpdateState.Checking ->
+                DropdownMenuItem(text = { Text("Checking…") }, onClick = {}, enabled = false)
+
+            is UpdateState.Downloading -> DropdownMenuItem(
+                text = { Text("Downloading ${updateState.tag} ${(updateState.fraction * 100).toInt()}%") },
+                onClick = {},
+                enabled = false,
+            )
+
+            is UpdateState.Ready -> DropdownMenuItem(
+                text = { Text("Install ${updateState.tag}") },
+                onClick = { open = false; onInstallUpdate() },
+            )
+
+            is UpdateState.UpToDate -> DropdownMenuItem(
+                text = { Text("Up to date — check again") },
+                onClick = onCheckUpdate,
+            )
+
+            is UpdateState.Failed -> DropdownMenuItem(
+                text = { Text(updateState.reason) },
+                onClick = onCheckUpdate,
+            )
+
+            is UpdateState.Idle -> DropdownMenuItem(
+                text = { Text("Check for updates") },
+                onClick = onCheckUpdate,
+            )
+        }
+
+        HorizontalDivider()
+        DropdownMenuItem(
+            text = { Text("Unpair this phone") },
+            onClick = { open = false; onUnpair() },
+        )
+    }
+}
+
 @Composable
 fun UpdateRow(state: UpdateState, onCheck: () -> Unit, onInstall: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -148,12 +249,23 @@ fun SessionListScreen(
     updateState: UpdateState,
     onCheckUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
+    accountEmail: String?,
+    accountPhotoUrl: String?,
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Sessions") },
-                actions = { TextButton(onClick = onUnpair) { Text("Unpair") } },
+                actions = {
+                    AccountMenu(
+                        email = accountEmail,
+                        photoUrl = accountPhotoUrl,
+                        updateState = updateState,
+                        onCheckUpdate = onCheckUpdate,
+                        onInstallUpdate = onInstallUpdate,
+                        onUnpair = onUnpair,
+                    )
+                },
             )
         },
     ) { padding ->
@@ -181,10 +293,6 @@ fun SessionListScreen(
                 }
             }
 
-            item {
-                Spacer(Modifier.height(16.dp))
-                UpdateRow(updateState, onCheckUpdate, onInstallUpdate)
-            }
         }
     }
 }

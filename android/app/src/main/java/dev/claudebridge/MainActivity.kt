@@ -187,6 +187,8 @@ fun BridgeApp(initialSessionId: String?) {
             updateState = updateState,
             onCheckUpdate = { Updater.check(context, manual = true) },
             onInstallUpdate = { Updater.install(context) },
+            accountEmail = Auth.email(),
+            accountPhotoUrl = Auth.photoUrl(),
         )
     }
 }

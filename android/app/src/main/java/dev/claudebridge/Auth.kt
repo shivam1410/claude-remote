@@ -24,6 +24,12 @@ object Auth {
 
     fun uid(): String? = runCatching { FirebaseAuth.getInstance().currentUser?.uid }.getOrNull()
 
+    fun email(): String? = runCatching { FirebaseAuth.getInstance().currentUser?.email }.getOrNull()
+
+    /** The Google account photo, when there is one. Null is normal, not an error. */
+    fun photoUrl(): String? =
+        runCatching { FirebaseAuth.getInstance().currentUser?.photoUrl?.toString() }.getOrNull()
+
     /**
      * The OAuth web client id the google-services plugin writes into resources.
      * Looked up by name rather than through R so the project still compiles
