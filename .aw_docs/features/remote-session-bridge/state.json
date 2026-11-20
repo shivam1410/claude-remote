@@ -2,7 +2,7 @@
   "feature_slug": "remote-session-bridge",
   "stage": "build",
   "mode": "full",
-  "status": "phase_4_complete",
+  "status": "phase_4_complete_spike_5_1_passed",
   "created_at": "2026-11-20",
   "artifacts": {
     "spec.md": "written",
@@ -51,7 +51,12 @@
     "R1 \u2014 FCM fan-out needs Cloud Functions and therefore billing; the fallback is a foreground service on the handset.",
     "R2 \u2014 scope spans hooks, a daemon, a cloud function, and an Android app; phases 1 to 5 deliver a usable subset.",
     "R3 \u2014 heuristic summaries read mechanically on list-shaped or question-shaped messages.",
-    "R4 \u2014 the reply path depends on resume semantics verified from CLI help but not yet exercised end to end."
+    "R4 \u2014 the reply path depends on resume semantics verified from CLI help but not yet exercised end to end.",
+    {
+      "id": "R4",
+      "status": "partly_resolved",
+      "note": "Mechanical fork question answered: resume continues the same session. Context continuity and resume-while-running remain untested because the claude CLI cannot authenticate (OAuth session expired). D6 queue-when-busy stands as the conservative design."
+    }
   ],
   "adr_needed": [],
   "adr_not_needed_because": "The decisions are recorded in spec.md and context.md, and the encryption choice is self-evident from the constraint that the host must not be able to read session content.",
@@ -179,7 +184,7 @@
       "Phase 3 verified against the live project: auth, rules, publish, delete",
       "Phase 4 QR pairing with key rotation"
     ],
-    "next": "Phase 5.1 resume-vs-fork spike, the hard checkpoint before the reply path",
+    "next": "Phase 5.2 inject.mjs and the busy-session queue",
     "evidence": {
       "tests": "50/50 green via `node --test test/*.test.mjs` in bridge/",
       "live_hook_proof": "SessionStart and SessionEnd records spooled from a real `claude -p` run on 2026-11-20",
@@ -191,12 +196,13 @@
       "decrypt_proof": "nodes read back from Firebase are opaque; decrypted locally with the Keychain shared key",
       "rules_denial_proof": "npm run rules-check: 7 denial probes + 1 control, all as specified",
       "uid": "(redacted: tied to a real Google account; stored in the Keychain)",
-      "pairing": "66 tests green; QR renders at 148 chars with finder patterns and quiet zone; decoded key decrypts a sealed payload"
+      "pairing": "66 tests green; QR renders at 148 chars with finder patterns and quiet zone; decoded key decrypts a sealed payload",
+      "spike_5_1": "resume continues: same session_id, transcript 31->42->52 lines, no new .jsonl. See spike-5.1-resume.md"
     },
     "open_decisions": [
       "R1 \u2014 Cloud Functions on Blaze vs Android foreground service",
       "R4 \u2014 resume-vs-fork spike at task 5.1"
     ]
   },
-  "updated_at": "2026-11-20T14:08:51+0530"
+  "updated_at": "2026-11-20T14:12:57+0530"
 }

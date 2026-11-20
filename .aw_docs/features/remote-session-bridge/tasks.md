@@ -80,7 +80,7 @@ Highest-value phase: everything here is testable with no Firebase account.
 
 Prove R4 before building on it.
 
-- [ ] 5.1 Spike: manually run `claude --bg --resume <id> -p "hi"` against a
+- [x] 5.1 Spike: manually run `claude --bg --resume <id> -p "hi"` against a
       scratch session and confirm it continues rather than forking. If it
       forks, stop and re-plan this phase.
 - [ ] 5.2 `bridge/src/service/inject.mjs` — decrypt, validate the target, run the
