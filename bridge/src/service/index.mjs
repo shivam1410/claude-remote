@@ -31,6 +31,10 @@ const HEARTBEAT_PATH = join(CONFIG_DIR, 'heartbeat');
 // How long a request may sit unanswered before the service prunes it. The hook
 // has already fallen back to `ask` by then, so a later answer has nowhere to go.
 const APPROVAL_TTL_MS = DEFAULT_TIMEOUT_MS + 30_000;
+// A push announces that something needs you now. Ten minutes later it is
+// noise, and with no consumer deployed it is unbounded growth: the node sat
+// at 46 and climbing with nothing reading it.
+const PUSH_TTL_MS = 10 * 60 * 1000;
 const POLL_MS = 2000;
 const PAYLOAD_VERSION = 1;
 
@@ -290,6 +294,37 @@ function defaultWriteDecision(requestId, decision) {
 }
 
 /**
+ * Drop pushes nobody collected. Returns how many went.
+ *
+ * Without a consumer this path grows forever. Even with one, a push that
+ * failed to send is stale within minutes — re-sending it later would announce
+ * a state the session has long since left.
+ */
+export async function prunePushes(config, deps = {}) {
+  const {
+    listPushes = db.listPushes,
+    deletePush = db.deletePush,
+    now = Date.now(),
+  } = deps;
+
+  const pending = await listPushes(config);
+  if (!pending) return 0;
+
+  let pruned = 0;
+  for (const [pushId, node] of Object.entries(pending)) {
+    const createdAt = Number(node?.createdAt);
+    // A node with no usable timestamp cannot be aged, and leaving it would
+    // mean it is never collected either.
+    if (!Number.isFinite(createdAt) || now - createdAt > PUSH_TTL_MS) {
+      await deletePush(config, pushId);
+      pruned += 1;
+    }
+  }
+  if (pruned > 0) console.log(`pruned ${pruned} stale push(es)`);
+  return pruned;
+}
+
+/**
  * Touch the heartbeat. A hook refuses to wait for a decision unless this file
  * is fresh, so a dead service costs a session no latency at all.
  */
@@ -308,6 +343,7 @@ export async function tick(config, key, deps = {}) {
     publish: runPublish = publish,
     relayDecisions: runRelay = relayDecisions,
     deliverReplies: runDeliver = deliverReplies,
+    prunePushes: runPrune = prunePushes,
   } = deps;
   beat();
 
@@ -321,6 +357,7 @@ export async function tick(config, key, deps = {}) {
     ['publish', async () => { touched = await runPublish(config, key); }],
     ['relayDecisions', () => runRelay(config, key)],
     ['deliverReplies', () => runDeliver(config, key)],
+    ['prunePushes', () => runPrune(config)],
   ]) {
     try {
       await run();

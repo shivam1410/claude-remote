@@ -80,6 +80,16 @@ export function putPush(config, pushId, node) {
   return request(config, 'PUT', `/pushes/${pushId}`, node);
 }
 
+/** Read every queued push, so stale ones can be pruned. */
+export function listPushes(config) {
+  return request(config, 'GET', '/pushes');
+}
+
+/** Remove one push. */
+export function deletePush(config, pushId) {
+  return request(config, 'DELETE', `/pushes/${pushId}`);
+}
+
 /** Read the uid the bridge is currently authenticated as. */
 export async function currentUid(config) {
   return (await getIdToken(config)).uid;
