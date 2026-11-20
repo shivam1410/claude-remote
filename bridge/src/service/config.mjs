@@ -28,9 +28,12 @@ export function validate(raw) {
       `config is missing: ${missing.join(', ')}. See docs/firebase-setup.md.`,
     );
   }
-  if (!/^https:\/\/[\w.-]+\.firebasedatabase\.app\/?$/.test(raw.databaseUrl)) {
+  // Two valid shapes, depending on the database's region:
+  //   us-central1  -> https://<name>.firebaseio.com
+  //   anywhere else -> https://<name>.<region>.firebasedatabase.app
+  if (!/^https:\/\/[\w.-]+\.(?:firebaseio\.com|firebasedatabase\.app)\/?$/.test(raw.databaseUrl)) {
     throw new Error(
-      `databaseUrl must be the Realtime Database https URL, got: ${raw.databaseUrl}`,
+      `databaseUrl must be the Realtime Database https URL ending in firebaseio.com or firebasedatabase.app, got: ${raw.databaseUrl}`,
     );
   }
   return {

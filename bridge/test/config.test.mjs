@@ -26,6 +26,12 @@ test('rejects a blank field rather than failing later at the network', () => {
   assert.throws(() => validate({ ...GOOD, apiKey: '   ' }), /apiKey/);
 });
 
+test('accepts a us-central1 firebaseio.com database URL', () => {
+  const url = 'https://my-project-default-rtdb.firebaseio.com';
+  assert.equal(validate({ ...GOOD, databaseUrl: url }).databaseUrl, url);
+  assert.equal(validate({ ...GOOD, databaseUrl: `${url}/` }).databaseUrl, url);
+});
+
 test('rejects a database URL that is not a Realtime Database URL', () => {
   assert.throws(() => validate({ ...GOOD, databaseUrl: 'https://console.firebase.google.com/x' }), /databaseUrl/);
   assert.throws(() => validate({ ...GOOD, databaseUrl: 'http://x.firebasedatabase.app' }), /databaseUrl/);
