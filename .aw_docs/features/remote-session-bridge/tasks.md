@@ -71,9 +71,9 @@ Highest-value phase: everything here is testable with no Firebase account.
 
 ## Phase 4 — Pairing
 
-- [ ] 4.1 `bridge/src/service/pair.mjs` — generate a 32-byte key, store in the
+- [x] 4.1 `bridge/src/service/pair.mjs` — generate a 32-byte key, store in the
       Keychain, render a QR encoding key, uid, and database URL.
-- [ ] 4.2 `bridge --pair` CLI entrypoint.
+- [x] 4.2 `bridge --pair` CLI entrypoint.
 - [ ] Commit: `feat: QR device pairing`
 
 ## Phase 5 — Reply path

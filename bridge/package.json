@@ -12,6 +12,13 @@
     "doctor": "node src/service/doctor.mjs",
     "login": "node src/service/auth.mjs --login",
     "start": "node src/service/index.mjs",
-    "rules-check": "node src/service/rules-check.mjs"
+    "rules-check": "node src/service/rules-check.mjs",
+    "pair": "node src/service/pair.mjs"
+  },
+  "dependencies": {
+    "qrcode-generator": "2.0.4"
+  },
+  "bin": {
+    "bridge": "src/cli.mjs"
   }
 }
