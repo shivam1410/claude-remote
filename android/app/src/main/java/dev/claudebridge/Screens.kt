@@ -263,7 +263,9 @@ fun SessionListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Sessions") },
+                // The count is diagnostic as much as cosmetic: it separates
+                // "nothing arrived" from "it arrived and the list dropped it".
+                title = { Text(if (sessions.isEmpty()) "Sessions" else "Sessions (${sessions.size})") },
                 actions = {
                     AccountMenu(
                         email = accountEmail,
