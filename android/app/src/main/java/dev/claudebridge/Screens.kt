@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -268,17 +270,11 @@ fun SessionListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.Bottom) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Sessions")
                         if (sessions.isNotEmpty()) {
-                            // Smaller and dimmer: it is a count, not part of
-                            // the title.
-                            Text(
-                                " ${sessions.size}",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(bottom = 3.dp),
-                            )
+                            Spacer(Modifier.width(8.dp))
+                            CountBadge(sessions.size)
                         }
                     }
                 },
@@ -545,6 +541,30 @@ private fun ReplyBar(session: SessionPayload, onReply: (String) -> Unit) {
 }
 
 private val REPLY_BAR_HEIGHT = 56.dp
+
+/**
+ * The session count, as a notification badge.
+ *
+ * A pill rather than a fixed circle: at two digits a circle either clips the
+ * number or has to grow, and a capsule does that on its own.
+ */
+@Composable
+private fun CountBadge(count: Int) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .defaultMinSize(minWidth = 22.dp, minHeight = 22.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary)
+            .padding(horizontal = 6.dp),
+    ) {
+        Text(
+            count.toString(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onPrimary,
+        )
+    }
+}
 
 /**
  * The state, as a coloured pill.
