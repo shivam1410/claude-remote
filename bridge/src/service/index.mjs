@@ -15,7 +15,7 @@ import { mkdirSync, writeFileSync, utimesSync, closeSync, openSync } from 'node:
 import { randomUUID } from 'node:crypto';
 import { load, SPOOL_DIR, CONFIG_DIR } from './config.mjs';
 import { drain, readCursor, writeCursor } from './spool.mjs';
-import { fold, projectLabel, shouldPush } from './sessionState.mjs';
+import { fold, projectLabel, shouldPush, workspaceRoot } from './sessionState.mjs';
 import { lastAssistantMessage } from './transcript.mjs';
 import { summarise } from '../core/summarise.mjs';
 import { seal, open as unseal, generateKey } from '../core/crypto.mjs';
@@ -128,7 +128,13 @@ export async function publish(config, key) {
     } else {
       await db.putSession(config, session.sessionId, nodeFor(key, session));
       sessionStates.set(session.sessionId, session.state);
-      if (session.cwd) sessionCwds.set(session.sessionId, session.cwd);
+      // The repository root, not the momentary cwd. Workspace trust is
+      // granted per workspace, and a session's cwd wanders into
+      // subdirectories that were never trusted on their own — which is
+      // exactly how delivery kept failing with "Workspace not trusted".
+      if (session.cwd) {
+        sessionCwds.set(session.sessionId, workspaceRoot(session.cwd) ?? session.cwd);
+      }
     }
   }
 

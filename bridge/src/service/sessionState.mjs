@@ -30,6 +30,24 @@ export function stateForEvent(record) {
 }
 
 /** The short project label shown on the phone: the working directory's name. */
+/**
+ * The workspace a session belongs to: its repository root, resolved through a
+ * worktree pointer when there is one. Null when it is not inside a repository.
+ *
+ * This is what a resume must run in. Workspace trust is granted per workspace,
+ * and a session's cwd wanders into subdirectories that were never trusted on
+ * their own.
+ */
+export function workspaceRoot(cwd, repoRootOf = defaultRepoRootOf) {
+  if (typeof cwd !== 'string' || cwd === '') return null;
+  const parts = cwd.replace(/\/+$/, '').split('/').filter(Boolean);
+  for (let i = parts.length; i > 0; i -= 1) {
+    const root = repoRootOf(`/${parts.slice(0, i).join('/')}`);
+    if (root) return root;
+  }
+  return null;
+}
+
 export function projectLabel(cwd, repoRootOf = defaultRepoRootOf) {
   if (typeof cwd !== 'string' || cwd === '') return 'unknown';
   const parts = cwd.replace(/\/+$/, '').split('/').filter(Boolean);
@@ -39,10 +57,8 @@ export function projectLabel(cwd, repoRootOf = defaultRepoRootOf) {
   // would otherwise be labelled by that subdirectory — "android" rather than
   // the project it belongs to, which is useless on a phone showing several
   // sessions at once.
-  for (let i = parts.length; i > 0; i -= 1) {
-    const root = repoRootOf(`/${parts.slice(0, i).join('/')}`);
-    if (root) return root.replace(/\/+$/, '').split('/').filter(Boolean).pop() ?? 'unknown';
-  }
+  const root = workspaceRoot(cwd, repoRootOf);
+  if (root) return root.replace(/\/+$/, '').split('/').filter(Boolean).pop() ?? 'unknown';
   return parts[parts.length - 1];
 }
 

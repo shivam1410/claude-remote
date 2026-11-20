@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { stateForEvent, projectLabel, fold } from '../src/service/sessionState.mjs';
+import { stateForEvent, projectLabel, fold, workspaceRoot } from '../src/service/sessionState.mjs';
 
 test('maps hook events to the spec state vocabulary', () => {
   assert.equal(stateForEvent({ event: 'SessionStart' }), 'running');
@@ -120,4 +120,17 @@ test('projectLabel falls back to the leaf outside a repository', () => {
   assert.equal(projectLabel('/tmp/scratch/deep', never), 'deep');
   assert.equal(projectLabel('', never), 'unknown');
   assert.equal(projectLabel(undefined, never), 'unknown');
+});
+
+test('workspaceRoot is the repository, not whichever subdirectory a session wandered into', () => {
+  // Delivery kept failing with "Workspace not trusted" because the resume ran
+  // in the session's momentary cwd. Trust is granted per workspace, and the
+  // cwd moves around as commands run.
+  const roots = (dir) => (dir === '/Users/me/code/my-project' ? dir : null);
+  assert.equal(
+    workspaceRoot('/Users/me/code/my-project/bridge/src', roots),
+    '/Users/me/code/my-project',
+  );
+  assert.equal(workspaceRoot('/tmp/not-a-repo', () => null), null);
+  assert.equal(workspaceRoot('', () => null), null);
 });
