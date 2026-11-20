@@ -87,6 +87,11 @@ function payloadFor(session) {
     summary: summarise(raw),
     tool: scrub(session.tool ?? ''),
     ts: session.ts,
+    // The full last message, markdown kept (tables, links, lists), secrets
+    // still scrubbed — the org rule redacts before any sink, encrypted or not.
+    // Capped so the sealed blob stays under the 4096 database-rule limit; a
+    // longer message is cut with an ellipsis rather than making publish fail.
+    body: bodyOf(raw),
     // Present only for a Remote-Control-connected session: lets the phone
     // open it in the official Claude app. Not scrubbed — it is a claude.ai
     // session id, not work content — but still sealed with everything else.
@@ -123,6 +128,14 @@ async function pushNow(config, blob, deps = {}) {
   } catch (error) {
     console.log(`push failed: ${error.message}`);
   }
+}
+
+const MAX_BODY_CHARS = 2000;
+
+/** The full message for the detail view: scrubbed, markdown intact, bounded. */
+function bodyOf(raw) {
+  const text = scrub(typeof raw === 'string' ? raw : '');
+  return text.length > MAX_BODY_CHARS ? `${text.slice(0, MAX_BODY_CHARS)}\n\n…` : text;
 }
 
 /** Build the encrypted node for one folded session. */

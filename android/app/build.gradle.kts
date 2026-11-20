@@ -99,6 +99,13 @@ dependencies {
     // lifecycle handling that a rolled-by-hand version always gets wrong.
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    // Full markdown for the message body — tables, links, lists, code — too
+    // much to hand-roll. Markwon core plus the table and linkify extensions,
+    // rendered into a TextView; its table support is the reason over a
+    // pure-Compose renderer that mangled grids.
+    implementation("io.noties.markwon:core:4.6.2")
+    implementation("io.noties.markwon:ext-tables:4.6.2")
+    implementation("io.noties.markwon:linkify:4.6.2")
     // Task.await() for the Firebase SDKs.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 

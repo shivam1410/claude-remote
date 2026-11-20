@@ -58,7 +58,14 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import android.text.method.LinkMovementMethod
+import android.widget.TextView
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.viewinterop.AndroidView
+import io.noties.markwon.Markwon
+import io.noties.markwon.ext.tables.TablePlugin
+import io.noties.markwon.linkify.LinkifyPlugin
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
@@ -426,20 +433,9 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit) {
                 },
             )
         },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(stateLabel(session.state), style = MaterialTheme.typography.labelLarge)
-            if (session.branch.isNotEmpty()) Text(session.branch, style = MaterialTheme.typography.labelMedium)
-
-            // Replying into a live session is the official app's job, not ours:
-            // claude --resume forks, so this bridge cannot do it. Hand off.
+        // The handoff is the primary action, so it is pinned to the bottom and
+        // stays put while the message scrolls — the spot the reply bar held.
+        bottomBar = {
             session.openUrl?.let { url ->
                 val context = LocalContext.current
                 Button(
@@ -451,12 +447,15 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit) {
                             )
                         }
                     },
-                    // Claude's own coral, so the handoff reads as "this goes to
-                    // Claude" rather than a generic app button.
                     colors = ButtonDefaults.buttonColors(
                         containerColor = ClaudeOrange,
                         contentColor = Color.White,
                     ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .height(52.dp),
                 ) {
                     Icon(
                         painterResource(R.drawable.ic_claude),
@@ -467,16 +466,36 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit) {
                     Text("Open in Claude to reply")
                 }
             }
-            if (session.ts > 0) {
-                Text(
-                    DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(session.ts)),
-                    style = MaterialTheme.typography.labelSmall,
-                )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StateTag(session.state)
+                if (session.ts > 0) {
+                    Text(
+                        DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(session.ts)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            Text(
-                inlineMarkdown(session.summary.ifEmpty { "Nothing said yet." }),
-                style = MaterialTheme.typography.bodyLarge,
-            )
+            if (session.branch.isNotEmpty()) {
+                Text(session.branch, style = MaterialTheme.typography.labelMedium)
+            }
+            val content = session.body.ifEmpty { session.summary }.ifEmpty { "Nothing said yet." }
+            MarkdownBody(content, Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -538,6 +557,39 @@ private fun StateTag(state: String) {
             .clip(RoundedCornerShape(6.dp))
             .background(background)
             .padding(horizontal = 8.dp, vertical = 3.dp),
+    )
+}
+
+/**
+ * The message body as rendered markdown: tables, links, lists, code.
+ *
+ * A TextView via Markwon rather than Compose text: Markwon's table extension
+ * draws real grids, which the Compose-native renderers did not.
+ */
+@Composable
+private fun MarkdownBody(text: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val markwon = remember(context) {
+        Markwon.builder(context)
+            .usePlugin(TablePlugin.create(context))
+            .usePlugin(LinkifyPlugin.create())
+            .build()
+    }
+    val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            TextView(ctx).apply {
+                textSize = 16f
+                setLineSpacing(0f, 1.15f)
+                movementMethod = LinkMovementMethod.getInstance()
+                setTextIsSelectable(true)
+            }
+        },
+        update = { tv ->
+            tv.setTextColor(textColor)
+            markwon.setMarkdown(tv, text)
+        },
     )
 }
 

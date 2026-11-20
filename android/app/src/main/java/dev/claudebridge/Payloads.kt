@@ -35,6 +35,8 @@ data class SessionPayload(
     // Present only when the session is connected to Remote Control. The URL to
     // open it in the official Claude app (or browser).
     val openUrl: String? = null,
+    // The full last message, markdown preserved, for the detail view.
+    val body: String = "",
 ) {
     val needsAttention: Boolean get() = state == "waiting_input" || state == "waiting_approval"
 }
