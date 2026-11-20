@@ -114,6 +114,8 @@ function harness(pending) {
         delete pending[pushId];
       },
       run: async (payload) => ran.push(payload.text),
+      // The CLI's live view. Tests that care about the fork guard override it.
+      status: async () => 'idle',
     },
   };
 }
@@ -194,5 +196,86 @@ test('a failed delivery records why, and keeps the reply', async () => {
   assert.equal(errors[0][0], 'r1');
   assert.equal(typeof errors[0][1], 'string');
   // Still queued: a failure must not look like a delivery.
+  assert.deepEqual(h.deleted, []);
+});
+
+test('a busy session is never resumed, however idle the bridge thinks it is', async () => {
+  // This is the one that matters. Resuming a running session starts a copy,
+  // and three forks were published before the guard existed — one of them
+  // tagged a release on the public repo on its own.
+  sessionStates.clear();
+  sessionStates.set('sess-1', 'waiting_input');
+  const pending = { r1: node(fresh({ sessionId: 'sess-1' })) };
+  const h = harness(pending);
+
+  const delivered = await deliverReplies({}, key, { ...h.deps, status: async () => 'busy' });
+
+  assert.equal(delivered, 0);
+  assert.deepEqual(h.ran, []);
+  // Still queued: it goes out when the session is genuinely idle.
+  assert.deepEqual(h.deleted, []);
+});
+
+test('an unreadable status is treated as busy, not as permission to deliver', async () => {
+  // Failing closed costs a delay. Failing open costs a forked conversation.
+  sessionStates.clear();
+  sessionStates.set('sess-1', 'waiting_input');
+  const pending = { r1: node(fresh({ sessionId: 'sess-1' })) };
+  const h = harness(pending);
+
+  assert.equal(await deliverReplies({}, key, { ...h.deps, status: async () => null }), 0);
+  assert.deepEqual(h.ran, []);
+  assert.deepEqual(h.deleted, []);
+});
+
+test('a confirmed idle session is resumed exactly once', async () => {
+  sessionStates.clear();
+  sessionStates.set('sess-1', 'waiting_input');
+  const pending = { r1: node(fresh({ sessionId: 'sess-1', text: 'carry on' })) };
+  const h = harness(pending);
+
+  assert.equal(await deliverReplies({}, key, { ...h.deps, status: async () => 'idle' }), 1);
+  assert.deepEqual(h.ran, ['carry on']);
+  assert.deepEqual(h.deleted, ['r1']);
+});
+
+test('the session is stopped before it is resumed, in that order', async () => {
+  // Proven by experiment: `--resume` against a live process always starts a
+  // copy — "already running, so this started a copy" — whether the session is
+  // busy or idle. Only an exited session continues under its own id, so the
+  // stop is what makes the reply land in the same conversation rather than a
+  // fork the desktop never shows.
+  sessionStates.clear();
+  sessionStates.set('sess-1', 'waiting_input');
+  const pending = { r1: node(fresh({ sessionId: 'sess-1', text: 'carry on' })) };
+  const order = [];
+  const h = harness(pending);
+
+  const delivered = await deliverReplies({}, key, {
+    ...h.deps,
+    status: async () => 'idle',
+    stop: async (id) => order.push(`stop:${id}`),
+    run: async (payload) => order.push(`resume:${payload.text}`),
+  });
+
+  assert.equal(delivered, 1);
+  assert.deepEqual(order, ['stop:sess-1', 'resume:carry on']);
+  assert.deepEqual(h.deleted, ['r1']);
+});
+
+test('a busy session is not stopped, so nothing in flight is interrupted', async () => {
+  sessionStates.clear();
+  sessionStates.set('sess-1', 'waiting_input');
+  const pending = { r1: node(fresh({ sessionId: 'sess-1' })) };
+  const stopped = [];
+  const h = harness(pending);
+
+  await deliverReplies({}, key, {
+    ...h.deps,
+    status: async () => 'busy',
+    stop: async (id) => stopped.push(id),
+  });
+
+  assert.deepEqual(stopped, []);
   assert.deepEqual(h.deleted, []);
 });

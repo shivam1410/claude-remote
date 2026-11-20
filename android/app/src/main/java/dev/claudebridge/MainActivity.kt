@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.firebase.messaging.FirebaseMessaging
@@ -212,12 +213,38 @@ fun BridgeApp(initialSessionId: String?) {
     }
 }
 
+// Material3's stock schemes are purple with pink accents. Blue, and only the
+// slots the app actually uses — the rest of the scheme stays the default.
+private val LightScheme = lightColorScheme(
+    primary = Color(0xFF1A5FD0),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFD7E3FF),
+    onPrimaryContainer = Color(0xFF00174A),
+    secondary = Color(0xFF4A5C78),
+    tertiary = Color(0xFF1F6B33),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFBFF0C8),
+    onTertiaryContainer = Color(0xFF00210C),
+)
+
+private val DarkScheme = darkColorScheme(
+    primary = Color(0xFFAEC8FF),
+    onPrimary = Color(0xFF002B6E),
+    primaryContainer = Color(0xFF00458F),
+    onPrimaryContainer = Color(0xFFD7E3FF),
+    secondary = Color(0xFFB6C6E3),
+    tertiary = Color(0xFF8BD79B),
+    onTertiary = Color(0xFF00390F),
+    tertiaryContainer = Color(0xFF00531C),
+    onTertiaryContainer = Color(0xFFBFF0C8),
+)
+
 @Composable
 fun BridgeTheme(content: @Composable () -> Unit) {
     // Fixed schemes rather than dynamic colour: dynamic needs API 31 and this
     // app targets 26, and a status list reads better with stable colours anyway.
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme(),
+        colorScheme = if (isSystemInDarkTheme()) DarkScheme else LightScheme,
     ) {
         // MaterialTheme paints nothing on its own, and Material3's
         // LocalContentColor defaults to Color.Black until a Surface sets it

@@ -589,7 +589,7 @@ private fun StateTag(state: String) {
     // has semantic slots for.
     val dark = isSystemInDarkTheme()
     val hue = when (state) {
-        "waiting_input" -> if (dark) Color(0xFFB69DF8) else Color(0xFF5B3BB5)
+        "waiting_input" -> if (dark) Color(0xFFAEC8FF) else Color(0xFF1A5FD0)
         "waiting_approval" -> if (dark) Color(0xFFFFB77C) else Color(0xFFB34700)
         "error" -> if (dark) Color(0xFFFF8A80) else Color(0xFFB3261E)
         "done" -> if (dark) Color(0xFF8BD79B) else Color(0xFF1F6B33)

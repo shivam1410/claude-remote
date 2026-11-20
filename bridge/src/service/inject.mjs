@@ -21,6 +21,7 @@ export const IDLE_STATES = new Set(['waiting_input']);
 const MAX_TEXT_CHARS = 2000;
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SPAWN_TIMEOUT_MS = 15_000;
+const AGENTS_TIMEOUT_MS = 10_000;
 
 /**
  * Decrypt and validate one reply node.
@@ -83,6 +84,23 @@ export function classify(payload, sessions) {
  * execFile with an argv array, never a shell string: the text comes off the
  * network and must never be parsed by anything but `claude` itself.
  */
+/**
+ * Stop a session so it can be continued rather than copied.
+ *
+ * `--resume` forks whenever the target process is alive — idle or not, the
+ * CLI says "already running, so this started a copy". Only an exited session
+ * can be continued under its own id. Stopping first is therefore not an
+ * optimisation, it is the only way to reply into the same conversation.
+ *
+ * Safe precisely because delivery is gated on waiting_input: a session asking
+ * the user a question has nothing in flight to interrupt.
+ */
+export function halt(sessionId, { bin = resolveBin() } = {}) {
+  return new Promise((resolve) => {
+    execFile(bin, ['stop', sessionId], { timeout: AGENTS_TIMEOUT_MS }, () => resolve());
+  });
+}
+
 export function deliver(payload, { bin = resolveBin(), cwd } = {}) {
   return new Promise((resolve, reject) => {
     execFile(
@@ -106,6 +124,32 @@ export function deliver(payload, { bin = resolveBin(), cwd } = {}) {
  * Where the `claude` binary lives.
  * launchd gives a user agent a minimal PATH, so a bare name is not enough.
  */
+/**
+ * What the CLI itself says about a session right now.
+ *
+ * The bridge's own view comes from the last hook event it saw, and that goes
+ * stale the moment the user types again. Delivering on a stale "idle" is what
+ * forked three sessions: `--resume` against a running session starts a copy.
+ *
+ * Returns the status string, or null when it cannot be determined — and the
+ * caller treats null as "do not deliver". Failing closed costs a delay;
+ * failing open costs a forked conversation and an agent nobody is watching.
+ */
+export function liveStatus(sessionId, { bin = resolveBin() } = {}) {
+  return new Promise((resolve) => {
+    execFile(bin, ['agents', '--json'], { timeout: AGENTS_TIMEOUT_MS }, (error, stdout) => {
+      if (error) return resolve(null);
+      try {
+        const agents = JSON.parse(stdout);
+        const match = agents.find((a) => a?.sessionId === sessionId);
+        resolve(match ? match.status ?? null : 'gone');
+      } catch {
+        resolve(null);
+      }
+    });
+  });
+}
+
 export function resolveBin(env = process.env) {
   return env.CLAUDE_BRIDGE_CLAUDE_BIN || `${env.HOME ?? ''}/.local/bin/claude`;
 }

@@ -22,7 +22,7 @@ import { seal, open as unseal, generateKey } from '../core/crypto.mjs';
 import { scrub } from '../core/scrub.mjs';
 import * as db from './db.mjs';
 import * as keychain from './keychain.mjs';
-import { decode, classify, deliver } from './inject.mjs';
+import { decode, classify, deliver, liveStatus, halt } from './inject.mjs';
 import { DEFAULT_TIMEOUT_MS } from '../core/approval.mjs';
 
 const CURSOR_PATH = join(CONFIG_DIR, 'cursor.json');
@@ -157,6 +157,8 @@ export async function deliverReplies(config, key, deps = {}) {
     deleteReply = db.deleteReply,
     putReplyError = db.putReplyError,
     run = deliver,
+    status = liveStatus,
+    stop = halt,
   } = deps;
   const pending = await listReplies(config);
   if (!pending) return 0;
@@ -168,7 +170,21 @@ export async function deliverReplies(config, key, deps = {}) {
 
     if (action === 'queue') continue;
     if (action === 'deliver') {
+      // Ask the CLI, not our own memory. Anything but a confirmed idle is a
+      // reason to wait: resuming a busy session forks it.
+      const live = await status(payload.sessionId);
+      if (live !== 'idle') {
+        if (live === 'gone') {
+          // The session is not running at all, so resuming cannot continue
+          // it. Hold rather than start something nobody asked for.
+          sessionStates.delete(payload.sessionId);
+        }
+        continue;
+      }
       try {
+        // Stop before resuming. A live process is copied, not continued, so
+        // this is what makes the reply land in the same conversation.
+        await stop(payload.sessionId);
         await run(payload, { cwd: sessionCwds.get(payload.sessionId) });
       } catch (error) {
         // Put the reason where the phone can see it. Without this a reply sat

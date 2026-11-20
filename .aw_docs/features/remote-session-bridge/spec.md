@@ -34,7 +34,7 @@ way to see it or unblock it from a phone.
 | D3b | Personal Firebase project: Realtime Database for state, FCM for push. |
 | D4 | Google sign-in pinned to one account uid on both ends. |
 | D5 | A session is removed from the database the moment it ends, is archived, or is deleted. |
-| D6 | A reply sent while the session is busy is queued and delivered when it next goes idle. |
+| D6 | A reply sent while the session is busy is queued and delivered when it next goes idle. Delivery stops the session first — see R4. |
 | D7 | Remote permission approval applies to flagged tools in enrolled sessions only. |
 | D8 | All active sessions publish. No allowlist. |
 | D9 | Hooks always fail open. Bounded timeout, always exit zero. |
@@ -142,8 +142,24 @@ Phone encrypts and writes to `/u/{uid}/replies`. The service decrypts, checks
 the target session is known and idle, then runs:
 
 ```
+claude stop <sessionId>
 claude --bg --resume <sessionId> "<text>"
 ```
+
+The stop is not optional. Measured on 2.1.329: `--resume` against a session
+whose process is alive always starts a copy, and says so — "session <id> is
+already running in the background, so this started a copy as <new id>". That
+holds when the session is *idle*, not just busy, so idleness alone was never a
+sufficient guard. Only a session whose process has exited continues under its
+own id, with its history intact.
+
+Three sessions were forked in production before this was measured, one of
+which published a release to the public repository unattended.
+
+Delivery is gated on `waiting_input` so the stop costs nothing: a session
+asking the user a question has no work in flight. A session open in the
+desktop app moves to the background when continued this way; `claude attach
+<id>` reopens it.
 
 If the session is busy the reply is held and delivered on the next idle event.
 This matters: resuming a session that is already running starts a copy instead
@@ -194,8 +210,24 @@ summary, the tool name, and the project label.
   first real reply was sent from the phone. Correct form:
 
 ```
+claude stop <sessionId>
 claude --bg --resume <sessionId> "<text>"
 ```
+
+The stop is not optional. Measured on 2.1.329: `--resume` against a session
+whose process is alive always starts a copy, and says so — "session <id> is
+already running in the background, so this started a copy as <new id>". That
+holds when the session is *idle*, not just busy, so idleness alone was never a
+sufficient guard. Only a session whose process has exited continues under its
+own id, with its history intact.
+
+Three sessions were forked in production before this was measured, one of
+which published a release to the public repository unattended.
+
+Delivery is gated on `waiting_input` so the stop costs nothing: a session
+asking the user a question has no work in flight. A session open in the
+desktop app moves to the background when continued this way; `claude attach
+<id>` reopens it.
 
 ## Verification
 
