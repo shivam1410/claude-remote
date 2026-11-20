@@ -44,7 +44,7 @@ object Notifications {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(session.summary.ifEmpty { session.state })
             .setStyle(NotificationCompat.BigTextStyle().bigText(session.summary))
