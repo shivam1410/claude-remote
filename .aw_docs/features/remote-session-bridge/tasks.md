@@ -102,10 +102,24 @@ Prove R4 before building on it.
 
 ## Phase 7 — Push
 
-- [x] 7.1 Decide R1: enable Blaze for Cloud Functions, or fall back to an
-      Android foreground service. Blocks 7.2.
-- [x] 7.2 `functions/index.js` — database trigger, FCM data-only fan-out.
+- [x] 7.1 R1 resolved, and neither option was needed. FCM v1 accepts a user
+      access token carrying `firebase.messaging`, so the Mac sends directly:
+      no Blaze, no service account key on disk, no foreground service.
+      Measured against the live project before building — dry run 400 on the
+      dummy token, real sealed payload 200, notification received on the
+      handset.
+- [x] 7.2 `bridge/src/service/fcm.mjs` — data-only, high priority, dead tokens
+      unregistered. `functions/` is now unused; the `/pushes` path it fed is
+      gone.
 - [x] 7.3 Device token registration path.
+- [x] 7.4 Bound the legacy `/pushes` queue with a TTL, since it had grown to 56
+      nodes with no consumer.
+
+Operational note: while the OAuth app is in Testing, Google expires the Google
+refresh token after 7 days, so pushes stop until `npm run login` is re-run.
+Session publishing and replies are unaffected — those use the Firebase refresh
+token, which is not subject to that limit. Publishing the app removes the
+expiry.
 - [ ] Commit: `feat: push fan-out on actionable state changes`
 
 ## Phase 8 — Android app
