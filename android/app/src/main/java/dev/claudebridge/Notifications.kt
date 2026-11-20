@@ -35,9 +35,10 @@ object Notifications {
         }
 
         ensureChannel(context)
+        val notificationId = session.sessionId.hashCode()
         val tap = PendingIntent.getActivity(
             context,
-            session.sessionId.hashCode(),
+            notificationId,
             Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 .putExtra(MainActivity.EXTRA_SESSION_ID, session.sessionId),
@@ -55,10 +56,14 @@ object Notifications {
         // "Open in Claude" only when the session is on Remote Control: that is
         // the one way to reply into a live session, which this app cannot.
         session.openUrl?.let { url ->
+            // Through the trampoline, not straight to ACTION_VIEW, so the
+            // notification is dismissed as the Claude app opens.
             val open = PendingIntent.getActivity(
                 context,
                 url.hashCode(),
-                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                Intent(context, OpenUrlActivity::class.java)
+                    .putExtra(OpenUrlActivity.EXTRA_URL, url)
+                    .putExtra(OpenUrlActivity.EXTRA_NOTIFICATION_ID, notificationId),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             builder.addAction(0, "Open in Claude", open)
@@ -69,7 +74,7 @@ object Notifications {
         try {
             // One notification per session: a later update replaces the earlier
             // one rather than stacking five lines about the same thing.
-            NotificationManagerCompat.from(context).notify(session.sessionId.hashCode(), notification)
+            NotificationManagerCompat.from(context).notify(notificationId, notification)
         } catch (e: SecurityException) {
             // POST_NOTIFICATIONS not granted. The in-app list still works.
         }

@@ -413,15 +413,7 @@ private fun SessionCard(session: SessionPayload, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SessionDetailScreen(
-    session: SessionPayload,
-    queued: List<QueuedReply>,
-    onBack: () -> Unit,
-    onReply: (String) -> Unit,
-    sendError: String? = null,
-) {
-    var text by remember { mutableStateOf("") }
-
+fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -433,26 +425,23 @@ fun SessionDetailScreen(
                 },
             )
         },
-        bottomBar = { ReplyBar(session, onReply, sendError) },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp)
-                // The summary can run long and the keyboard eats half the
-                // screen, so the body scrolls and the reply row does not.
+                .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(stateLabel(session.state), style = MaterialTheme.typography.labelLarge)
             if (session.branch.isNotEmpty()) Text(session.branch, style = MaterialTheme.typography.labelMedium)
 
-            // Only when the session is on Remote Control: the official Claude
-            // app can reply into a live session, which this bridge cannot.
+            // Replying into a live session is the official app's job, not ours:
+            // claude --resume forks, so this bridge cannot do it. Hand off.
             session.openUrl?.let { url ->
                 val context = LocalContext.current
-                OutlinedButton(
+                Button(
                     onClick = {
                         runCatching {
                             context.startActivity(
@@ -464,7 +453,7 @@ fun SessionDetailScreen(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Open in Claude")
+                    Text("Open in Claude to reply")
                 }
             }
             if (session.ts > 0) {
@@ -477,113 +466,9 @@ fun SessionDetailScreen(
                 inlineMarkdown(session.summary.ifEmpty { "Nothing said yet." }),
                 style = MaterialTheme.typography.bodyLarge,
             )
-
-            // Without this a sent message simply vanished: it was written to
-            // the database and held until the session went idle, and nothing
-            // on screen said so.
-            if (queued.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Waiting to send",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                for (item in queued.sortedBy { it.reply.ts }) {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(item.reply.text, style = MaterialTheme.typography.bodyMedium)
-                            // The real reason when there is one. Never claim
-                            // progress that is not happening.
-                            Text(
-                                when {
-                                    item.error != null -> item.error
-                                    session.needsAttention -> "Queued — the Mac will pick this up"
-                                    else -> "Queued — held until this session asks for input"
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (item.error != null) {
-                                    MaterialTheme.colorScheme.error
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }
-
-/** Text field and send button, same height, side by side. */
-@Composable
-private fun ReplyBar(session: SessionPayload, onReply: (String) -> Unit, sendError: String?) {
-    var text by remember(session.sessionId) { mutableStateOf("") }
-    val canSend = text.isNotBlank()
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            // Sits above the keyboard and clear of the gesture bar.
-            .imePadding()
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        if (sendError != null) {
-            Text(
-                sendError,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(bottom = 6.dp),
-            )
-        }
-
-        if (!session.needsAttention) {
-            // The Mac holds a reply until the session is idle, because
-            // resuming a running one forks the conversation.
-            Text(
-                "Busy — a reply is held until it next asks for input.",
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(bottom = 6.dp),
-            )
-        }
-
-        Row(
-            // A fixed height on the row is what makes the button match the
-            // field exactly; IntrinsicSize would leave it to the text field's
-            // own minimum and drift with the font scale.
-            modifier = Modifier.fillMaxWidth().height(REPLY_BAR_HEIGHT),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                placeholder = { Text("Reply") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-            )
-            FilledIconButton(
-                onClick = {
-                    onReply(text.trim())
-                    text = ""
-                },
-                enabled = canSend,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxHeight().aspectRatio(1f),
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
-            }
-        }
-    }
-}
-
-private val REPLY_BAR_HEIGHT = 56.dp
 
 /**
  * The session count, as a notification badge.

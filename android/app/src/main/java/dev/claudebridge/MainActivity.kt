@@ -59,7 +59,6 @@ fun BridgeApp(initialSessionId: String?) {
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(initialSessionId) }
-    var sendError by remember { mutableStateOf<String?>(null) }
 
     val configured = remember { Auth.configured(context) }
     var photoUrl by remember { mutableStateOf(Auth.photoUrl(context)) }
@@ -173,7 +172,6 @@ fun BridgeApp(initialSessionId: String?) {
 
     val sessions by repo.sessions.collectAsStateWithLifecycle(emptyList())
     val approvals by repo.approvals.collectAsStateWithLifecycle(emptyList())
-    val queuedReplies by repo.pendingReplies.collectAsStateWithLifecycle(emptyList())
 
     val open = sessions.firstOrNull { it.sessionId == selected }
 
@@ -183,22 +181,7 @@ fun BridgeApp(initialSessionId: String?) {
     BackHandler(enabled = open != null) { selected = null }
 
     if (open != null) {
-        SessionDetailScreen(
-            session = open,
-            queued = queuedReplies.filter { it.reply.sessionId == open.sessionId },
-            onBack = { selected = null },
-            onReply = { text ->
-                scope.launch {
-                    // A send that fails has to say so. Swallowing it meant a
-                    // message that never left the phone looked identical to
-                    // one the Mac had not picked up yet.
-                    repo.reply(open.sessionId, text)
-                        .onFailure { sendError = it.message ?: "Could not send" }
-                        .onSuccess { sendError = null }
-                }
-            },
-            sendError = sendError,
-        )
+        SessionDetailScreen(session = open, onBack = { selected = null })
     } else {
         SessionListScreen(
             sessions = sessions,

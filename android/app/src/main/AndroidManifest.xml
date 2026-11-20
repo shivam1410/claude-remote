@@ -43,6 +43,13 @@
             android:theme="@style/zxing_CaptureTheme"
             tools:replace="android:screenOrientation" />
 
+        <activity
+            android:name=".OpenUrlActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <receiver
             android:name=".InstallReceiver"
             android:exported="false" />

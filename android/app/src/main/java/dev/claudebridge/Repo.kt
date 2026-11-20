@@ -20,9 +20,6 @@ import javax.crypto.SecretKey
  * Everything readable is produced here, on the handset. What travels is
  * ciphertext plus a version and a timestamp, and that is all the console shows.
  */
-/** A reply the phone has sent, with the reason it has not landed yet. */
-data class QueuedReply(val reply: ReplyPayload, val error: String?)
-
 class Repo(private val uid: String, private val key: SecretKey, databaseUrl: String) {
 
     private val root: DatabaseReference =
@@ -50,43 +47,7 @@ class Repo(private val uid: String, private val key: SecretKey, databaseUrl: Str
         else decode<ApprovalPayload>(snapshot.child("blob").getValue(String::class.java))
     }
 
-    /**
-     * Replies this phone has sent that the Mac has not delivered yet.
-     *
-     * Without this a sent message vanished: it was written to the database and
-     * held until the session went idle, but nothing on screen said so.
-     */
-    val pendingReplies: Flow<List<QueuedReply>> = stream("replies") { snapshot ->
-        val reply = decode<ReplyPayload>(snapshot.child("blob").getValue(String::class.java))
-        reply?.let {
-            QueuedReply(
-                reply = it,
-                // Present only when the Mac has tried and failed.
-                error = decode<ReplyError>(
-                    snapshot.child("errorBlob").getValue(String::class.java),
-                )?.message,
-            )
-        }
-    }
 
-    /**
-     * Queue a reply. The Mac delivers it when that session is next idle.
-     *
-     * Returns a Result so a failed write can be shown. Firebase queues writes
-     * offline and the await only completes once the server has them, so a
-     * failure here genuinely means the message is not in the database.
-     */
-    suspend fun reply(sessionId: String, text: String): Result<Unit> = runCatching {
-        val payload = ReplyPayload(sessionId = sessionId, text = text, ts = System.currentTimeMillis())
-        root.child("replies").push().setValue(
-            mapOf(
-                "v" to PAYLOAD_VERSION,
-                "createdAt" to payload.ts,
-                "blob" to Crypto.seal(key, BridgeJson.encodeToString(payload)),
-            ),
-        ).await()
-        Unit
-    }
 
     /**
      * Answer a pending tool permission. The hook on the Mac is blocked polling
