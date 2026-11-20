@@ -95,3 +95,6 @@ coverage/
 # ---------------------------------------------------------------------------
 tmp/
 *.log
+
+# AW tooling scratch state, rewritten constantly
+.aw_docs/cache/
