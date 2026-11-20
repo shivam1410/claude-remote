@@ -1,0 +1,185 @@
+package dev.claudebridge
+
+import android.Manifest
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.firebase.messaging.FirebaseMessaging
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+
+class MainActivity : ComponentActivity() {
+
+    companion object {
+        const val EXTRA_SESSION_ID = "sessionId"
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        val openSession = intent?.getStringExtra(EXTRA_SESSION_ID)
+        setContent {
+            BridgeTheme {
+                BridgeApp(openSession)
+            }
+        }
+    }
+}
+
+@Composable
+fun BridgeApp(initialSessionId: String?) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var signedIn by remember { mutableStateOf(Auth.uid() != null) }
+    var paired by remember { mutableStateOf(Vault.isPaired() && Paired.uid(context) != null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(initialSessionId) }
+
+    val configured = remember { Auth.configured(context) }
+
+    // Android 13+ shows nothing at all without this, and the whole point is
+    // the notification. Asked once, on first launch.
+    val notifications = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val pairing = result.contents?.let(Pairing::decode)
+        if (pairing == null) {
+            error = "That QR is not a pairing code from this bridge."
+            return@rememberLauncherForActivityResult
+        }
+        val uid = Auth.uid()
+        if (uid != null && uid != pairing.uid) {
+            error = "That pairing belongs to a different Google account."
+            return@rememberLauncherForActivityResult
+        }
+        Paired.accept(context, pairing)
+        paired = true
+        error = null
+    }
+
+    // Register this handset for push once both halves are in place; the token
+    // is what the Cloud Function fans out to.
+    LaunchedEffect(signedIn, paired) {
+        if (signedIn && paired) {
+            runCatching {
+                FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+                    Devices.register(context, token)
+                }
+            }
+        }
+    }
+
+    if (!signedIn || !paired) {
+        SetupScreen(
+            configured = configured,
+            signedIn = signedIn,
+            paired = paired,
+            error = error,
+            busy = busy,
+            onSignIn = {
+                busy = true
+                error = null
+                scope.launch {
+                    Auth.signIn(context)
+                        .onSuccess { signedIn = true }
+                        .onFailure { error = it.message ?: "Sign-in failed." }
+                    busy = false
+                }
+            },
+            onScan = {
+                error = null
+                scanner.launch(
+                    ScanOptions()
+                        .setOrientationLocked(false)
+                        .setBeepEnabled(false)
+                        .setPrompt("Point at the QR the Mac printed"),
+                )
+            },
+        )
+        return
+    }
+
+    val repo = remember(signedIn, paired) { Repo.of(context) }
+    if (repo == null) {
+        // Signed in and paired but the repo would not build: the key or the
+        // database URL is gone. Pairing again is the only honest fix.
+        SetupScreen(
+            configured = configured,
+            signedIn = true,
+            paired = false,
+            error = "Pairing is incomplete. Scan the QR again.",
+            busy = false,
+            onSignIn = {},
+            onScan = {
+                scanner.launch(ScanOptions().setOrientationLocked(false).setBeepEnabled(false))
+            },
+        )
+        return
+    }
+
+    val sessions by repo.sessions.collectAsStateWithLifecycle(emptyList())
+    val approvals by repo.approvals.collectAsStateWithLifecycle(emptyList())
+
+    val open = sessions.firstOrNull { it.sessionId == selected }
+    if (open != null) {
+        SessionDetailScreen(
+            session = open,
+            onBack = { selected = null },
+            onReply = { text -> scope.launch { runCatching { repo.reply(open.sessionId, text) } } },
+        )
+    } else {
+        SessionListScreen(
+            sessions = sessions,
+            approvals = approvals,
+            onOpen = { selected = it.sessionId },
+            onDecide = { approval, allow ->
+                scope.launch { runCatching { repo.decide(approval.requestId, allow) } }
+            },
+            onUnpair = {
+                Devices.unregister(context)
+                Paired.clear(context)
+                Auth.signOut()
+                signedIn = false
+                paired = false
+                selected = null
+            },
+        )
+    }
+}
+
+@Composable
+fun BridgeTheme(content: @Composable () -> Unit) {
+    // Fixed schemes rather than dynamic colour: dynamic needs API 31 and this
+    // app targets 26, and a status list reads better with stable colours anyway.
+    MaterialTheme(
+        colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme(),
+        content = content,
+    )
+}

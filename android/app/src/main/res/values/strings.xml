@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Claude Remote</string>
+    <string name="channel_sessions">Session updates</string>
+</resources>
