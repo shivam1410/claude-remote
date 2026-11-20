@@ -81,3 +81,13 @@ security delete-generic-password -s claude-bridge -a sharedKey
 
 Deleting `sharedKey` also orphans every paired phone, which is the intended
 response to a lost handset.
+
+## 7. Check your work
+
+```bash
+cd bridge && npm run doctor
+```
+
+It stops at the first unfinished step and masks every secret, so the output is
+safe to paste. When it reaches the end it has written, read back, and deleted a
+probe node through the live rules — that is the proof the whole chain works.

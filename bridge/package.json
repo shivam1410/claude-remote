@@ -4,8 +4,13 @@
   "private": true,
   "type": "module",
   "description": "End-to-end encrypted bridge publishing local Claude Code session state to a paired Android client.",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "doctor": "node src/service/doctor.mjs",
+    "login": "node src/service/auth.mjs --login",
+    "start": "node src/service/index.mjs"
   }
 }
