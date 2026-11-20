@@ -189,10 +189,20 @@ export async function deliverReplies(config, key, deps = {}) {
         }
         continue;
       }
+      // Stop before resuming. A live process is copied, not continued, so
+      // this is what makes the reply land in the same conversation — and if
+      // it cannot be stopped, resuming would fork. Hold instead.
+      if (!(await stop(payload.sessionId))) {
+        console.log(`reply ${pushId}: cannot stop ${payload.sessionId}, holding rather than forking`);
+        continue;
+      }
+      const after = await status(payload.sessionId);
+      if (after !== 'gone') {
+        console.log(`reply ${pushId}: still ${after ?? 'unknown'} after stop, holding`);
+        continue;
+      }
+
       try {
-        // Stop before resuming. A live process is copied, not continued, so
-        // this is what makes the reply land in the same conversation.
-        await stop(payload.sessionId);
         await run(payload, { cwd: sessionCwds.get(payload.sessionId) });
       } catch (error) {
         // Put the reason where the phone can see it. Without this a reply sat

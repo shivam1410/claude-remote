@@ -97,7 +97,12 @@ export function classify(payload, sessions) {
  */
 export function halt(sessionId, { bin = resolveBin() } = {}) {
   return new Promise((resolve) => {
-    execFile(bin, ['stop', sessionId], { timeout: AGENTS_TIMEOUT_MS }, () => resolve());
+    // Resolves false when the stop did not work. Ignoring this is what forked
+    // a session: `claude stop` cannot address an interactive session, the
+    // failure was swallowed, and the resume ran against a live process.
+    execFile(bin, ['stop', sessionId], { timeout: AGENTS_TIMEOUT_MS }, (error) => {
+      resolve(!error);
+    });
   });
 }
 

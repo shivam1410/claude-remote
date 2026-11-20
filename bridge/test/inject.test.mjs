@@ -104,9 +104,11 @@ const fresh = (overrides = {}) => reply({ ts: Date.now(), ...overrides });
 function harness(pending) {
   const deleted = [];
   const ran = [];
+  const halted = new Set();
   return {
     deleted,
     ran,
+    halted,
     deps: {
       listReplies: async () => pending,
       deleteReply: async (_config, pushId) => {
@@ -114,8 +116,9 @@ function harness(pending) {
         delete pending[pushId];
       },
       run: async (payload) => ran.push(payload.text),
-      // The CLI's live view. Tests that care about the fork guard override it.
-      status: async () => 'idle',
+      // Mirrors the real CLI: a stopped session disappears from `agents`.
+      stop: async (id) => { halted.add(id); return true; },
+      status: async (id) => (halted.has(id) ? 'gone' : 'idle'),
     },
   };
 }
@@ -186,9 +189,12 @@ test('a failed delivery records why, and keeps the reply', async () => {
   const errors = [];
   const h = harness(pending);
 
+  let stopped = false;
   await assert.rejects(() => deliverReplies({}, key, {
     ...h.deps,
     run: () => { throw new Error('Workspace not trusted. Run `claude` in /tmp/x'); },
+    stop: async () => { stopped = true; return true; },
+    status: async () => (stopped ? 'gone' : 'idle'),
     putReplyError: async (_config, pushId, blob) => { errors.push([pushId, blob]); },
   }));
 
@@ -234,7 +240,7 @@ test('a confirmed idle session is resumed exactly once', async () => {
   const pending = { r1: node(fresh({ sessionId: 'sess-1', text: 'carry on' })) };
   const h = harness(pending);
 
-  assert.equal(await deliverReplies({}, key, { ...h.deps, status: async () => 'idle' }), 1);
+  assert.equal(await deliverReplies({}, key, h.deps), 1);
   assert.deepEqual(h.ran, ['carry on']);
   assert.deepEqual(h.deleted, ['r1']);
 });
@@ -253,8 +259,8 @@ test('the session is stopped before it is resumed, in that order', async () => {
 
   const delivered = await deliverReplies({}, key, {
     ...h.deps,
-    status: async () => 'idle',
-    stop: async (id) => order.push(`stop:${id}`),
+    stop: async (id) => { order.push(`stop:${id}`); return true; },
+    status: async (id) => (order.includes(`stop:${id}`) ? 'gone' : 'idle'),
     run: async (payload) => order.push(`resume:${payload.text}`),
   });
 
@@ -277,5 +283,43 @@ test('a busy session is not stopped, so nothing in flight is interrupted', async
   });
 
   assert.deepEqual(stopped, []);
+  assert.deepEqual(h.deleted, []);
+});
+
+test('a session that cannot be stopped is never resumed', async () => {
+  // `claude stop` cannot address an interactive session. Swallowing that
+  // failure and resuming anyway is what forked a live conversation into a
+  // background copy the desktop never showed.
+  sessionStates.clear();
+  sessionStates.set('sess-1', 'waiting_input');
+  const pending = { r1: node(fresh({ sessionId: 'sess-1' })) };
+  const h = harness(pending);
+
+  const delivered = await deliverReplies({}, key, {
+    ...h.deps,
+    stop: async () => false,
+    status: async () => 'idle',
+  });
+
+  assert.equal(delivered, 0);
+  assert.deepEqual(h.ran, []);
+  assert.deepEqual(h.deleted, []);
+});
+
+test('a session still alive after the stop is never resumed', async () => {
+  sessionStates.clear();
+  sessionStates.set('sess-1', 'waiting_input');
+  const pending = { r1: node(fresh({ sessionId: 'sess-1' })) };
+  const h = harness(pending);
+
+  // stop claims success, but the process is still there.
+  const delivered = await deliverReplies({}, key, {
+    ...h.deps,
+    stop: async () => true,
+    status: async () => 'idle',
+  });
+
+  assert.equal(delivered, 0);
+  assert.deepEqual(h.ran, []);
   assert.deepEqual(h.deleted, []);
 });
