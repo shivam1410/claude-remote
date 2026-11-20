@@ -116,6 +116,20 @@ object Auth {
         }
     }
 
+    /**
+     * Pull the profile down from the server again.
+     *
+     * FirebaseUser is cached on disk and its providerData is whatever the
+     * sign-in response carried. The account's Google photo can exist
+     * server-side and be absent from that cached copy forever, because
+     * nothing refreshes it on its own. reload() is the only thing that does.
+     */
+    suspend fun refreshProfile(context: Context) {
+        runCatching { FirebaseAuth.getInstance().currentUser?.reload()?.await() }
+        // Re-read so the refreshed photo lands in the cache.
+        photoUrl(context)
+    }
+
     fun signOut(context: Context) = runCatching {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { remove(KEY_PHOTO) }
         FirebaseAuth.getInstance().signOut()

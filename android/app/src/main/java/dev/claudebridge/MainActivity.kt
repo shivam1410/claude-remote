@@ -60,11 +60,21 @@ fun BridgeApp(initialSessionId: String?) {
     var selected by remember { mutableStateOf(initialSessionId) }
 
     val configured = remember { Auth.configured(context) }
+    var photoUrl by remember { mutableStateOf(Auth.photoUrl(context)) }
     val updateState by Updater.state.collectAsStateWithLifecycle()
 
     // One quiet check per launch. It only surfaces when something is ready,
     // so a normal start shows nothing.
     LaunchedEffect(Unit) { Updater.check(context) }
+
+    // The cached FirebaseUser can lack the Google photo even when the account
+    // has one, and nothing refreshes it on its own.
+    LaunchedEffect(signedIn) {
+        if (signedIn) {
+            Auth.refreshProfile(context)
+            photoUrl = Auth.photoUrl(context)
+        }
+    }
 
     // Android 13+ shows nothing at all without this, and the whole point is
     // the notification. Asked once, on first launch.
@@ -197,7 +207,7 @@ fun BridgeApp(initialSessionId: String?) {
             onCheckUpdate = { Updater.check(context, manual = true) },
             onInstallUpdate = { Updater.install(context) },
             accountEmail = Auth.email(),
-            accountPhotoUrl = Auth.photoUrl(context),
+            accountPhotoUrl = photoUrl,
         )
     }
 }
