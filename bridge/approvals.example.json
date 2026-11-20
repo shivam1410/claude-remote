@@ -1,0 +1,6 @@
+{
+  "_comment": "Copy to ~/.claude-bridge/approvals.json to enable remote tool approval. Absent file = disabled.",
+  "tools": ["Bash", "Write", "Edit"],
+  "sessions": ["/Users/you/code/some-project"],
+  "timeoutMs": 15000
+}

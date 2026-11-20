@@ -61,3 +61,21 @@ export function fold(records) {
 
   return [...bySession.values()];
 }
+
+/**
+ * States worth waking a phone for (decision D10): the session needs the user,
+ * or it is over. `running` never pushes — that is just work happening.
+ */
+export const PUSH_STATES = new Set(['waiting_input', 'waiting_approval', 'done', 'error']);
+
+/**
+ * Should a transition into `next` send a push?
+ *
+ * Only on change. A session that emits three Notification events while waiting
+ * is still one interruption, and three identical buzzes would train the user to
+ * ignore all of them.
+ */
+export function shouldPush(previous, next) {
+  if (previous === next) return false;
+  return PUSH_STATES.has(next);
+}

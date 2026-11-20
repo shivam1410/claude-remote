@@ -47,6 +47,29 @@ export function deleteReply(config, pushId) {
   return request(config, 'DELETE', `/replies/${pushId}`);
 }
 
+/** Publish one pending tool-approval request. */
+export function putApproval(config, requestId, node) {
+  return request(config, 'PUT', `/approvals/${requestId}`, node);
+}
+
+/** Read every approval request, answered or not. */
+export function listApprovals(config) {
+  return request(config, 'GET', '/approvals');
+}
+
+/** Remove an approval request once it is answered or has expired. */
+export function deleteApproval(config, requestId) {
+  return request(config, 'DELETE', `/approvals/${requestId}`);
+}
+
+/**
+ * Queue one push for fan-out. The Cloud Function picks it up, sends it to every
+ * registered device, and deletes it.
+ */
+export function putPush(config, pushId, node) {
+  return request(config, 'PUT', `/pushes/${pushId}`, node);
+}
+
 /** Read the uid the bridge is currently authenticated as. */
 export async function currentUid(config) {
   return (await getIdToken(config)).uid;

@@ -11,16 +11,26 @@
 // running, sessions are unaffected and the spool simply grows until it starts.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { mkdirSync, writeFileSync, utimesSync, closeSync, openSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { load, SPOOL_DIR, CONFIG_DIR } from './config.mjs';
 import { drain, readCursor, writeCursor } from './spool.mjs';
-import { fold } from './sessionState.mjs';
+import { fold, projectLabel, shouldPush } from './sessionState.mjs';
 import { lastAssistantMessage } from './transcript.mjs';
 import { summarise } from '../core/summarise.mjs';
-import { seal, generateKey } from '../core/crypto.mjs';
+import { seal, open as unseal, generateKey } from '../core/crypto.mjs';
+import { scrub } from '../core/scrub.mjs';
 import * as db from './db.mjs';
 import * as keychain from './keychain.mjs';
+import { decode, classify, deliver } from './inject.mjs';
+import { DEFAULT_TIMEOUT_MS } from '../core/approval.mjs';
 
 const CURSOR_PATH = join(CONFIG_DIR, 'cursor.json');
+const DECISIONS_DIR = join(CONFIG_DIR, 'decisions');
+const HEARTBEAT_PATH = join(CONFIG_DIR, 'heartbeat');
+// How long a request may sit unanswered before the service prunes it. The hook
+// has already fallen back to `ask` by then, so a later answer has nowhere to go.
+const APPROVAL_TTL_MS = DEFAULT_TIMEOUT_MS + 30_000;
 const POLL_MS = 2000;
 const PAYLOAD_VERSION = 1;
 
@@ -47,39 +57,183 @@ async function sharedKey() {
   return key;
 }
 
-/** Build the encrypted node for one folded session. */
-function nodeFor(key, session) {
+/** The plaintext the phone will see once it decrypts. Scrubbed, never raw. */
+function payloadFor(session) {
   const raw = session.message || lastAssistantMessage(session.transcriptPath);
-  const payload = {
+  return {
     sessionId: session.sessionId,
-    project: session.project,
-    branch: branchOf(session.cwd),
+    project: scrub(session.project),
+    branch: scrub(branchOf(session.cwd) ?? ''),
     state: session.state,
     summary: summarise(raw),
-    tool: session.tool,
+    tool: scrub(session.tool ?? ''),
     ts: session.ts,
   };
-  return { v: PAYLOAD_VERSION, updatedAt: session.ts, blob: seal(key, payload) };
 }
 
-/** One drain-and-publish pass. Returns the number of sessions touched. */
-export async function tick(config, key) {
+/** Build the encrypted node for one folded session. */
+function nodeFor(key, session) {
+  return { v: PAYLOAD_VERSION, updatedAt: session.ts, blob: seal(key, payloadFor(session)) };
+}
+
+// Last published state per live session. The reply path needs it to tell an
+// idle session from a running one; a session is dropped the moment it ends.
+export const sessionStates = new Map();
+
+/** Drain the spool and publish. Returns the number of sessions touched. */
+export async function publish(config, key) {
   const cursor = readCursor(CURSOR_PATH);
   const { records, cursor: nextCursor } = drain(SPOOL_DIR, cursor);
   if (records.length === 0) return 0;
 
+  // Approval requests are per-call, not per-session, so they are handled before
+  // the fold collapses a batch down to one entry per session.
+  for (const record of records.filter((r) => r.requestId)) {
+    await db.putApproval(config, record.requestId, approvalNode(key, record));
+  }
+
   const sessions = fold(records);
   for (const session of sessions) {
+    const previous = sessionStates.get(session.sessionId);
+
+    // Queue the push before the node is touched: a finished session is deleted
+    // from /sessions straight away, but the phone still needs to be told.
+    if (shouldPush(previous, session.state)) {
+      await db.putPush(config, randomUUID(), {
+        v: PAYLOAD_VERSION,
+        createdAt: session.ts,
+        blob: seal(key, payloadFor(session)),
+      });
+    }
+
     if (session.ended) {
       await db.deleteSession(config, session.sessionId);
+      sessionStates.delete(session.sessionId);
     } else {
       await db.putSession(config, session.sessionId, nodeFor(key, session));
+      sessionStates.set(session.sessionId, session.state);
     }
   }
 
   // Only advance the cursor once every publish in this batch succeeded.
   writeCursor(CURSOR_PATH, nextCursor);
   return sessions.length;
+}
+
+/**
+ * Deliver whatever the phone has written to /replies.
+ *
+ * A reply whose target is busy is left in place: the node itself is the queue,
+ * so it survives a restart and is retried on the next pass once the session
+ * goes idle (decision D6). Anything undecodable or aimed at a session we do not
+ * know is deleted, otherwise it would be retried forever.
+ */
+export async function deliverReplies(config, key, deps = {}) {
+  const { listReplies = db.listReplies, deleteReply = db.deleteReply, run = deliver } = deps;
+  const pending = await listReplies(config);
+  if (!pending) return 0;
+
+  let delivered = 0;
+  for (const [pushId, node] of Object.entries(pending)) {
+    const payload = decode(key, node);
+    const { action } = classify(payload, sessionStates);
+
+    if (action === 'queue') continue;
+    if (action === 'deliver') {
+      await run(payload);
+      delivered += 1;
+      // The session is no longer idle; hold the rest of this batch for it.
+      sessionStates.set(payload.sessionId, 'running');
+    }
+    // Delete on both deliver and discard. Exactly-once rests on this: if the
+    // delete fails the node stays and the reply is sent twice, which is the
+    // safer of the two failures.
+    await deleteReply(config, pushId);
+  }
+  return delivered;
+}
+
+/** Build the encrypted node for one pending tool approval. */
+function approvalNode(key, record) {
+  const payload = {
+    v: PAYLOAD_VERSION,
+    requestId: record.requestId,
+    sessionId: record.sessionId,
+    project: scrub(projectLabel(record.cwd)),
+    tool: scrub(record.toolName ?? 'unknown'),
+    // The same redaction pipeline as a session summary: the phone sees enough
+    // to judge the call, never raw work content.
+    detail: summarise(record.toolDetail ?? ''),
+    ts: record.ts,
+  };
+  return { v: PAYLOAD_VERSION, createdAt: record.ts, blob: seal(key, payload) };
+}
+
+/**
+ * Relay answered approvals back to the blocked hooks, and prune expired ones.
+ *
+ * The decision travels to the hook through a file rather than a socket: the
+ * hook must stay dependency-free and must work when this service dies between
+ * writing the file and the hook reading it.
+ */
+export async function relayDecisions(config, key, deps = {}) {
+  const {
+    listApprovals = db.listApprovals,
+    deleteApproval = db.deleteApproval,
+    writeDecision = defaultWriteDecision,
+    now = Date.now(),
+  } = deps;
+
+  const pending = await listApprovals(config);
+  if (!pending) return 0;
+
+  let answered = 0;
+  for (const [requestId, node] of Object.entries(pending)) {
+    if (typeof node?.decisionBlob === 'string') {
+      try {
+        const decision = unseal(key, node.decisionBlob);
+        writeDecision(requestId, decision);
+        answered += 1;
+      } catch {
+        // Not sealed with the paired key: a forgery or a key mismatch. Dropping
+        // it means the hook times out and the local prompt appears.
+      }
+      await deleteApproval(config, requestId);
+      continue;
+    }
+    if (Number(node?.createdAt) > 0 && now - Number(node.createdAt) > APPROVAL_TTL_MS) {
+      await deleteApproval(config, requestId);
+    }
+  }
+  return answered;
+}
+
+/** Write one decision where the waiting hook polls for it. */
+function defaultWriteDecision(requestId, decision) {
+  mkdirSync(DECISIONS_DIR, { recursive: true });
+  writeFileSync(join(DECISIONS_DIR, `${requestId}.json`), JSON.stringify(decision), { mode: 0o600 });
+}
+
+/**
+ * Touch the heartbeat. A hook refuses to wait for a decision unless this file
+ * is fresh, so a dead service costs a session no latency at all.
+ */
+export function beat(path = HEARTBEAT_PATH) {
+  mkdirSync(CONFIG_DIR, { recursive: true });
+  try {
+    utimesSync(path, new Date(), new Date());
+  } catch {
+    closeSync(openSync(path, 'w'));
+  }
+}
+
+/** One full pass: publish state, relay approvals, deliver replies. */
+export async function tick(config, key) {
+  beat();
+  const touched = await publish(config, key);
+  await relayDecisions(config, key);
+  await deliverReplies(config, key);
+  return touched;
 }
 
 async function main() {

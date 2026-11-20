@@ -64,3 +64,31 @@ test('marks an ended session so the caller deletes it', () => {
 test('ignores records with no session id', () => {
   assert.deepEqual(fold([{ ts: 1, event: 'Stop' }]), []);
 });
+
+// --- push rule (D10) ---------------------------------------------------------
+import { shouldPush, PUSH_STATES } from '../src/service/sessionState.mjs';
+
+test('pushes when a session starts needing the user or finishes', () => {
+  assert.equal(shouldPush('running', 'waiting_input'), true);
+  assert.equal(shouldPush('running', 'waiting_approval'), true);
+  assert.equal(shouldPush('running', 'done'), true);
+  assert.equal(shouldPush('running', 'error'), true);
+});
+
+test('never pushes for work simply carrying on', () => {
+  assert.equal(shouldPush('waiting_input', 'running'), false);
+  assert.equal(shouldPush(undefined, 'running'), false);
+});
+
+test('does not push twice for the same state', () => {
+  assert.equal(shouldPush('waiting_input', 'waiting_input'), false);
+  assert.equal(shouldPush('done', 'done'), false);
+});
+
+test('pushes on a first sighting that already needs the user', () => {
+  assert.equal(shouldPush(undefined, 'waiting_input'), true);
+});
+
+test('push states are exactly the ones D10 names', () => {
+  assert.deepEqual([...PUSH_STATES].sort(), ['done', 'error', 'waiting_approval', 'waiting_input']);
+});
