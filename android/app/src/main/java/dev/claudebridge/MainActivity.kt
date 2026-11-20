@@ -173,7 +173,7 @@ fun BridgeApp(initialSessionId: String?) {
     if (open != null) {
         SessionDetailScreen(
             session = open,
-            queued = queuedReplies.filter { it.sessionId == open.sessionId },
+            queued = queuedReplies.filter { it.reply.sessionId == open.sessionId },
             onBack = { selected = null },
             onReply = { text -> scope.launch { runCatching { repo.reply(open.sessionId, text) } } },
         )

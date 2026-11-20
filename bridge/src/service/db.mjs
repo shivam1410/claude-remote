@@ -42,6 +42,16 @@ export function listReplies(config) {
   return request(config, 'GET', '/replies');
 }
 
+/**
+ * Record why a delivery failed, on the reply itself.
+ *
+ * Sealed like everything else: the message can name a path or a command, and
+ * that is exactly the kind of detail the console must not see.
+ */
+export function putReplyError(config, pushId, blob) {
+  return request(config, 'PUT', `/replies/${pushId}/errorBlob`, blob);
+}
+
 /** Remove a reply once it has been delivered. */
 export function deleteReply(config, pushId) {
   return request(config, 'DELETE', `/replies/${pushId}`);

@@ -173,3 +173,26 @@ test('a reply for a session not seen yet survives the pass', async () => {
   assert.equal(await deliverReplies({}, key, h.deps), 0);
   assert.deepEqual(h.deleted, []);
 });
+
+test('a failed delivery records why, and keeps the reply', async () => {
+  // Three replies once sat queued for forty minutes while every attempt
+  // failed on an untrusted workspace. The phone showed nothing; the reason
+  // existed only in a log on the Mac.
+  sessionStates.clear();
+  sessionStates.set('sess-1', 'waiting_input');
+  const pending = { r1: node(fresh({ sessionId: 'sess-1' })) };
+  const errors = [];
+  const h = harness(pending);
+
+  await assert.rejects(() => deliverReplies({}, key, {
+    ...h.deps,
+    run: () => { throw new Error('Workspace not trusted. Run `claude` in /tmp/x'); },
+    putReplyError: async (_config, pushId, blob) => { errors.push([pushId, blob]); },
+  }));
+
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0][0], 'r1');
+  assert.equal(typeof errors[0][1], 'string');
+  // Still queued: a failure must not look like a delivery.
+  assert.deepEqual(h.deleted, []);
+});

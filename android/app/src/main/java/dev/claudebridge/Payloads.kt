@@ -45,6 +45,14 @@ data class ReplyPayload(
     val ts: Long,
 )
 
+/** Why a delivery failed, sealed onto the reply it belongs to. */
+@Serializable
+data class ReplyError(
+    @SerialName("v") val version: Int = PAYLOAD_VERSION,
+    val message: String,
+    val ts: Long = 0,
+)
+
 /** A pending tool permission, relayed from a blocked PreToolUse hook. */
 @Serializable
 data class ApprovalPayload(

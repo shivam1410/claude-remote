@@ -411,7 +411,7 @@ private fun SessionCard(session: SessionPayload, onClick: () -> Unit) {
 @Composable
 fun SessionDetailScreen(
     session: SessionPayload,
-    queued: List<ReplyPayload>,
+    queued: List<QueuedReply>,
     onBack: () -> Unit,
     onReply: (String) -> Unit,
 ) {
@@ -463,7 +463,7 @@ fun SessionDetailScreen(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                for (reply in queued.sortedBy { it.ts }) {
+                for (item in queued.sortedBy { it.reply.ts }) {
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -471,15 +471,21 @@ fun SessionDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(reply.text, style = MaterialTheme.typography.bodyMedium)
-                            // Never claim progress that is not happening.
-                            // "Delivering…" read as a confirmation when the
-                            // Mac was in fact failing on every attempt.
+                            Text(item.reply.text, style = MaterialTheme.typography.bodyMedium)
+                            // The real reason when there is one. Never claim
+                            // progress that is not happening.
                             Text(
-                                if (session.needsAttention) "Queued — the Mac will pick this up"
-                                else "Queued — held until this session asks for input",
+                                when {
+                                    item.error != null -> item.error
+                                    session.needsAttention -> "Queued — the Mac will pick this up"
+                                    else -> "Queued — held until this session asks for input"
+                                },
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (item.error != null) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
                             )
                         }
                     }

@@ -152,7 +152,12 @@ export async function publish(config, key) {
  * know is deleted, otherwise it would be retried forever.
  */
 export async function deliverReplies(config, key, deps = {}) {
-  const { listReplies = db.listReplies, deleteReply = db.deleteReply, run = deliver } = deps;
+  const {
+    listReplies = db.listReplies,
+    deleteReply = db.deleteReply,
+    putReplyError = db.putReplyError,
+    run = deliver,
+  } = deps;
   const pending = await listReplies(config);
   if (!pending) return 0;
 
@@ -163,7 +168,19 @@ export async function deliverReplies(config, key, deps = {}) {
 
     if (action === 'queue') continue;
     if (action === 'deliver') {
-      await run(payload, { cwd: sessionCwds.get(payload.sessionId) });
+      try {
+        await run(payload, { cwd: sessionCwds.get(payload.sessionId) });
+      } catch (error) {
+        // Put the reason where the phone can see it. Without this a reply sat
+        // in the queue looking healthy while every attempt failed, and the
+        // only trace was a log line on the Mac.
+        await putReplyError(config, pushId, seal(key, {
+          v: PAYLOAD_VERSION,
+          message: scrub(summarise(String(error.message ?? error))),
+          ts: Date.now(),
+        })).catch(() => {});
+        throw error;
+      }
       delivered += 1;
       // The session is no longer idle; hold the rest of this batch for it.
       sessionStates.set(payload.sessionId, 'running');
