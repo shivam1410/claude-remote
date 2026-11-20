@@ -141,6 +141,12 @@ by hand; do not put the keystore in GitHub Actions secrets (`nhi7`:
 long-lived static credential). Android enforces same-signer for
 update-over-install, so the same key must sign every release.
 
+Done: `~/.android/claude-remote-release.jks` (alias `claude-remote`, RSA 4096),
+credentials as `CR_*` properties in `~/.gradle/gradle.properties`, conditional
+`signingConfig` in `android/app/build.gradle.kts`, and `scripts/release.sh`.
+See `docs/release.md` for the fingerprints Firebase needs and the backup
+warning.
+
 ## Phase 9 — Operationalise
 
 - [ ] 9.1 launchd plist with KeepAlive; install script.

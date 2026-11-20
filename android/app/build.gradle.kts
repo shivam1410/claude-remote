@@ -12,6 +12,10 @@ if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
 
+// Single source of truth for the app version; scripts/release.sh bumps it.
+val versionNameProp = providers.gradleProperty("VERSION_NAME").get()
+val versionCodeProp = versionNameProp.split(".").map(String::toInt).let { (a, b, c) -> a * 10000 + b * 100 + c }
+
 android {
     namespace = "dev.claudebridge"
     compileSdk = 35
@@ -21,9 +25,26 @@ android {
         // 26: the Android Keystore's AES-GCM support is dependable from here on.
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = versionCodeProp
+        versionName = versionNameProp
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Only exists when CR_STORE_FILE is set, so the project still builds on a
+    // machine without the keystore — the same reason google-services is
+    // applied conditionally above.
+    signingConfigs {
+        val storeFilePath = providers.gradleProperty("CR_STORE_FILE").orNull
+        if (storeFilePath != null) create("release") {
+            storeFile = file(storeFilePath)
+            storePassword = providers.gradleProperty("CR_STORE_PASSWORD").get()
+            keyAlias = providers.gradleProperty("CR_KEY_ALIAS").get()
+            keyPassword = providers.gradleProperty("CR_KEY_PASSWORD").get()
+            // v3 carries proof-of-rotation. Without it this key can never be
+            // rotated, and losing it would mean uninstall-and-re-pair.
+            enableV2Signing = true
+            enableV3Signing = true
+        }
     }
 
     buildTypes {
@@ -31,6 +52,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
