@@ -22,6 +22,37 @@ const REFRESH_ENDPOINT = 'https://securetoken.googleapis.com/v1/token';
 const SCOPES = 'openid email';
 const LOGIN_TIMEOUT_MS = 180_000;
 
+// Google returns the whole request URL in some error paths, and ours carries the
+// API key as a query parameter. Strip every query string before anything is
+// thrown, printed, or logged.
+function redactUrl(url) {
+  const index = url.indexOf('?');
+  return index === -1 ? url : `${url.slice(0, index)}?<redacted>`;
+}
+
+// Turn the opaque Identity Toolkit codes into something actionable.
+const REMEDIES = {
+  CONFIGURATION_NOT_FOUND:
+    'Firebase Authentication is not set up on this project. '
+    + 'Open the Firebase console -> Authentication -> Get started, '
+    + 'then enable the Google sign-in provider, and run this again.',
+  OPERATION_NOT_ALLOWED:
+    'The Google sign-in provider is disabled. '
+    + 'Enable it under Firebase console -> Authentication -> Sign-in method.',
+  INVALID_IDP_RESPONSE:
+    'Google rejected the credential. Run the login again; if it repeats, '
+    + 'recreate the Desktop OAuth client.',
+  invalid_client:
+    'The OAuth client is not recognised yet. A newly created client can take '
+    + 'a few minutes to propagate — wait and retry.',
+};
+
+function describe(url, status, code) {
+  const remedy = REMEDIES[code];
+  const base = `${redactUrl(url)} failed: ${status} ${code ?? ''}`.trim();
+  return remedy ? `${base}\n\n${remedy}` : base;
+}
+
 function base64url(buffer) {
   return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -34,9 +65,7 @@ async function postForm(url, params) {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    // Google echoes the client_id in errors but never the secret; still, only
-    // the error code is surfaced, so nothing sensitive reaches a log.
-    throw new Error(`${url} failed: ${response.status} ${body.error?.message ?? body.error ?? ''}`);
+    throw new Error(describe(url, response.status, body.error?.message ?? body.error));
   }
   return body;
 }
@@ -49,7 +78,7 @@ async function postJson(url, payload) {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(`${url} failed: ${response.status} ${body.error?.message ?? ''}`);
+    throw new Error(describe(url, response.status, body.error?.message));
   }
   return body;
 }
