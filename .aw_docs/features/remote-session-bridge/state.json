@@ -82,7 +82,9 @@
     "Rules pin reads and writes to the signed-in uid; encryption, not the rules, is the confidentiality control.",
     "Cross-uid read and write, root read, out-of-schema subtree, blob-less node, and oversized blob are all denied by the deployed rules, proven live with a valid token and a passing control probe (2026-11-20).",
     "Identity Toolkit error paths no longer echo the request URL, which carried the Web API key as a query parameter.",
-    "The pairing QR carries the shared key in the clear by necessity. Exposure is bounded: on request only, 120s display, scrollback wiped, never persisted. Rotation requires typing 'rotate' and unpairs every phone."
+    "The pairing QR carries the shared key in the clear by necessity. Exposure is bounded: on request only, 120s display, scrollback wiped, never persisted. Rotation requires typing 'rotate' and unpairs every phone.",
+    "Repo is public. Full-history audit before first push: no API keys, OAuth secrets, refresh tokens or private keys in any commit or blob. The real Firebase uid was purged from all 13 commits with filter-branch. Remaining pattern hits are placeholders in config.example.json and redaction test fixtures.",
+    "APK distribution open question: google-services.json values (apiKey, projectId, databaseUrl, appId) are compiled into any Android build and are extractable. They are non-secret by Firebase design, but they name the personal project. The shared encryption key is never in the APK; it arrives by QR at pairing and lives in the Android Keystore."
   ],
   "validation_commands": [
     "cd bridge && node --test",
@@ -204,5 +206,6 @@
       "R4 \u2014 resume-vs-fork spike at task 5.1"
     ]
   },
-  "updated_at": "2026-11-20T14:12:57+0530"
+  "updated_at": "2026-11-20T14:16:09+0530",
+  "repository": "https://github.com/shivam1410/claude-remote"
 }
