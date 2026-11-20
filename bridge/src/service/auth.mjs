@@ -19,7 +19,10 @@ const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const IDP_ENDPOINT = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp';
 const REFRESH_ENDPOINT = 'https://securetoken.googleapis.com/v1/token';
-const SCOPES = 'openid email';
+// firebase.messaging is what lets the bridge send its own pushes. Measured:
+// a user credential with this scope is accepted by the FCM v1 API, so no
+// service account key has to live on disk (nhi7).
+const SCOPES = 'openid email https://www.googleapis.com/auth/firebase.messaging';
 const LOGIN_TIMEOUT_MS = 180_000;
 
 // Google returns the whole request URL in some error paths, and ours carries the
@@ -171,6 +174,11 @@ export async function login(config = load()) {
 
   await keychain.set(keychain.accounts.REFRESH_TOKEN, firebase.refreshToken);
   await keychain.set(keychain.accounts.UID, firebase.localId);
+  // Google's refresh token is a different credential from Firebase's and the
+  // only one that can mint a messaging-scoped access token.
+  if (google.refresh_token) {
+    await keychain.set(keychain.accounts.GOOGLE_REFRESH_TOKEN, google.refresh_token);
+  }
 
   return { uid: firebase.localId, email: firebase.email };
 }
@@ -178,6 +186,43 @@ export async function login(config = load()) {
 // One in-memory token, refreshed slightly early so a long write never races
 // expiry. Not cached on disk: a stolen disk should yield nothing usable.
 let cached = { idToken: null, expiresAt: 0, uid: null };
+
+// Google access tokens are cached the same way and for the same reason: never
+// written to disk, refreshed a little early so a send never races expiry.
+let googleCached = { accessToken: null, expiresAt: 0 };
+
+/**
+ * A Google access token carrying the messaging scope, or null when the bridge
+ * has not been signed in since that scope was added.
+ *
+ * Null rather than throwing: a bridge that cannot send pushes must still
+ * publish state and deliver replies.
+ */
+export async function getAccessToken(config = load(), now = Date.now()) {
+  if (googleCached.accessToken && googleCached.expiresAt > now + 60_000) {
+    return googleCached.accessToken;
+  }
+
+  const refreshToken = await keychain.get(keychain.accounts.GOOGLE_REFRESH_TOKEN);
+  if (!refreshToken) return null;
+
+  try {
+    const google = await postForm(TOKEN_ENDPOINT, {
+      client_id: config.oauthClientId,
+      client_secret: config.oauthClientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    });
+    googleCached = {
+      accessToken: google.access_token,
+      expiresAt: now + Number(google.expires_in ?? 3600) * 1000,
+    };
+    return googleCached.accessToken;
+  } catch {
+    // Revoked or scope removed. The caller falls back to not pushing.
+    return null;
+  }
+}
 
 /** Return a valid Firebase ID token, refreshing when needed. */
 export async function getIdToken(config = load()) {

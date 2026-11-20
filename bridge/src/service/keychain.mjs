@@ -52,6 +52,10 @@ export async function remove(account) {
 
 export const accounts = {
   REFRESH_TOKEN: 'refreshToken',
+  // Google's own refresh token, kept beside Firebase's. Firebase ID tokens
+  // authenticate database writes; only a Google token carries the messaging
+  // scope that FCM requires.
+  GOOGLE_REFRESH_TOKEN: 'googleRefreshToken',
   SHARED_KEY: 'sharedKey',
   UID: 'uid',
 };

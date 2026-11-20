@@ -80,6 +80,16 @@ export function putPush(config, pushId, node) {
   return request(config, 'PUT', `/pushes/${pushId}`, node);
 }
 
+/** Every registered handset, so a push can reach them all. */
+export function listDevices(config) {
+  return request(config, 'GET', '/devices');
+}
+
+/** Drop a device FCM says will never receive again. */
+export function deleteDevice(config, installId) {
+  return request(config, 'DELETE', `/devices/${installId}`);
+}
+
 /** Read every queued push, so stale ones can be pruned. */
 export function listPushes(config) {
   return request(config, 'GET', '/pushes');

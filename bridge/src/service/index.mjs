@@ -21,6 +21,7 @@ import { summarise } from '../core/summarise.mjs';
 import { seal, open as unseal, generateKey } from '../core/crypto.mjs';
 import { scrub } from '../core/scrub.mjs';
 import * as db from './db.mjs';
+import * as fcm from './fcm.mjs';
 import * as keychain from './keychain.mjs';
 import { decode, classify, deliver, liveStatus, halt } from './inject.mjs';
 import { DEFAULT_TIMEOUT_MS } from '../core/approval.mjs';
@@ -88,6 +89,37 @@ function payloadFor(session) {
   };
 }
 
+/**
+ * Push one sealed payload to every registered handset.
+ *
+ * Never throws: a session's state is already in the database and the phone
+ * will show it on next open. A push is a nudge, not the record, so failing to
+ * send one must not stop publishing.
+ */
+async function pushNow(config, blob, deps = {}) {
+  const {
+    listDevices = db.listDevices,
+    deleteDevice = db.deleteDevice,
+    send = fcm.broadcast,
+  } = deps;
+
+  try {
+    const devices = await listDevices(config);
+    const { sent, dead, reason } = await send(config, devices, blob);
+    if (reason) console.log(`push skipped: ${reason}`);
+    else if (sent > 0) console.log(`pushed to ${sent} device(s)`);
+
+    for (const installId of dead ?? []) {
+      // FCM says this token is finished — an uninstall, usually. Leaving it
+      // means every future push wastes a call on it.
+      console.log(`dropping dead device ${installId}`);
+      await deleteDevice(config, installId);
+    }
+  } catch (error) {
+    console.log(`push failed: ${error.message}`);
+  }
+}
+
 /** Build the encrypted node for one folded session. */
 function nodeFor(key, session) {
   return { v: PAYLOAD_VERSION, updatedAt: session.ts, blob: seal(key, payloadFor(session)) };
@@ -121,11 +153,10 @@ export async function publish(config, key) {
     // Queue the push before the node is touched: a finished session is deleted
     // from /sessions straight away, but the phone still needs to be told.
     if (shouldPush(previous, session.state)) {
-      await db.putPush(config, randomUUID(), {
-        v: PAYLOAD_VERSION,
-        createdAt: session.ts,
-        blob: seal(key, payloadFor(session)),
-      });
+      // Sent straight from here. The /pushes node existed only so a Cloud
+      // Function could pick it up, and that needs Blaze; the Mac can send
+      // with the user's own messaging-scoped token instead.
+      await pushNow(config, seal(key, payloadFor(session)));
     }
 
     if (session.ended) {

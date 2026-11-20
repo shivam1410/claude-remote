@@ -191,11 +191,20 @@ summary, the tool name, and the project label.
 
 ## Risks
 
-- **R1 — Cloud Functions require the Blaze plan.** Sending FCM from the Mac
-  instead would mean a service account key on disk, which contradicts D4 and the
-  `nhi7` rule. If enabling billing is unacceptable, the fallback is an Android
-  foreground service holding the database connection open, trading battery and a
-  persistent notification for the removal of the key.
+- **R1 — RESOLVED, and the premise was wrong.** The assumption was that sending
+  FCM from the Mac requires a service account key. It does not. The FCM v1 API
+  accepts a *user* access token carrying the `firebase.messaging` scope, which
+  the bridge can mint from the Google refresh token it already obtains at
+  sign-in. Measured against the live project: a dry run returned 400 rejecting
+  only the dummy registration token, and a real sealed payload returned 200.
+
+  So Cloud Functions, Blaze, and the Android foreground service are all
+  unnecessary. FCM itself is free on every plan; only Cloud Functions needed
+  billing. No key lives on disk, so `nhi7` holds.
+
+  The `/u/{uid}/pushes` path existed solely so a Cloud Function could pick work
+  up. It is gone: the bridge sends at the moment it decides a push is
+  warranted.
 - **R2 — Scope.** This is four deliverables: hooks, a daemon, a cloud function,
   and an Android app. Phases 1 through 5 produce a working phone view and reply
   path; approvals and the app polish can follow.
