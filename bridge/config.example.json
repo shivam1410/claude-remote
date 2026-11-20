@@ -1,0 +1,7 @@
+{
+  "projectId": "your-firebase-project-id",
+  "apiKey": "your-firebase-web-api-key",
+  "databaseUrl": "https://your-db-default-rtdb.firebaseio.com",
+  "oauthClientId": "000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com",
+  "oauthClientSecret": "GOCSPX-your-desktop-client-secret"
+}

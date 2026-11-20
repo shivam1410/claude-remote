@@ -1,10 +1,97 @@
-node_modules/
+# ---------------------------------------------------------------------------
+# Secrets and credentials
+#
+# This repo is public-facing. Nothing that authenticates anything belongs in
+# it. The bridge keeps its real credentials in the macOS Keychain and its
+# project config in ~/.claude-bridge/config.json, both outside this tree, but
+# these patterns exist so an accidental copy inside the repo is never staged.
+# ---------------------------------------------------------------------------
+
+# Google / Firebase
+google-services.json
+GoogleService-Info.plist
+client_secret*.json
+*service-account*.json
+*serviceAccount*.json
+firebase-adminsdk*.json
+.firebaserc
+firebase-debug.log*
+firestore-debug.log*
+database-debug.log*
+
+# Bridge's own config, if ever copied into the tree
+config.json
+!bridge/config.example.json
+.claude-bridge/
+cursor.json
+spool/
+
+# Generic secret material
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+secrets/
+credentials/
+*.secret
+*secrets.properties
+keystore.properties
+signing.properties
+
+# ---------------------------------------------------------------------------
+# Android / Kotlin
+# ---------------------------------------------------------------------------
 *.apk
 *.aab
-secrets/
+*.ap_
+*.dex
+*.class
 local.properties
+.gradle/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+release/
+proguard/
+lint/
+*.iml
+.idea/
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+.kotlin/
+
+# ---------------------------------------------------------------------------
+# Node / bridge
+# ---------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.npm/
+coverage/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------------------
+# macOS and editors
+# ---------------------------------------------------------------------------
 .DS_Store
-firebase/*.local.json
-bridge/.env
-*.keystore
-google-services.json
+.AppleDouble
+._*
+.Spotlight-V100
+.Trashes
+*.swp
+*~
+.vscode/
+!.vscode/extensions.json
+
+# ---------------------------------------------------------------------------
+# Local scratch
+# ---------------------------------------------------------------------------
+tmp/
+*.log

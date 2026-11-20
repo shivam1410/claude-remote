@@ -190,7 +190,7 @@
       "live_publish": "16 sessions published from the real spool; 13 remain, 3 SessionEnd nodes deleted as specified",
       "decrypt_proof": "nodes read back from Firebase are opaque; decrypted locally with the Keychain shared key",
       "rules_denial_proof": "npm run rules-check: 7 denial probes + 1 control, all as specified",
-      "uid": "EXAMPLEUID000000000000000000",
+      "uid": "(redacted: tied to a real Google account; stored in the Keychain)",
       "pairing": "66 tests green; QR renders at 148 chars with finder patterns and quiet zone; decoded key decrypts a sealed payload"
     },
     "open_decisions": [
