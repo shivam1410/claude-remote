@@ -71,3 +71,34 @@ test('prunePushes drops only what has gone stale', async () => {
 test('prunePushes copes with an empty queue', async () => {
   assert.equal(await prunePushes({}, { listPushes: async () => null }), 0);
 });
+
+test('pickActionable surfaces a Stop even when a later tool call hides it in fold', async () => {
+  const { pickActionable } = await import('../src/service/index.mjs');
+  // One poll batch: a turn ended (Stop) and the next turn's first tool call
+  // arrived. fold would report "running" and the needs-you push would be lost.
+  const records = [
+    { sessionId: 's1', event: 'PreToolUse', ts: 100 },
+    { sessionId: 's1', event: 'Stop', ts: 200 },
+    { sessionId: 's1', event: 'PreToolUse', ts: 300 },
+  ];
+  const act = pickActionable(records);
+  assert.equal(act.get('s1').state, 'waiting_input');
+  assert.equal(act.get('s1').ts, 200);
+});
+
+test('pickActionable keeps the newest actionable when several arrive', async () => {
+  const { pickActionable } = await import('../src/service/index.mjs');
+  const records = [
+    { sessionId: 's1', event: 'Stop', ts: 100 },
+    { sessionId: 's1', event: 'Notification', message: 'needs permission', ts: 150 },
+  ];
+  const act = pickActionable(records);
+  assert.equal(act.get('s1').state, 'waiting_approval');
+  assert.equal(act.get('s1').ts, 150);
+});
+
+test('pickActionable ignores a batch of only running events', async () => {
+  const { pickActionable } = await import('../src/service/index.mjs');
+  const records = [{ sessionId: 's1', event: 'PreToolUse', ts: 100 }];
+  assert.equal(pickActionable(records).size, 0);
+});

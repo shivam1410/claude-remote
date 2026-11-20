@@ -15,7 +15,7 @@ import { mkdirSync, writeFileSync, utimesSync, closeSync, openSync } from 'node:
 import { randomUUID } from 'node:crypto';
 import { load, SPOOL_DIR, CONFIG_DIR } from './config.mjs';
 import { drain, readCursor, writeCursor } from './spool.mjs';
-import { fold, projectLabel, shouldPush, workspaceRoot } from './sessionState.mjs';
+import { fold, projectLabel, workspaceRoot, stateForEvent, PUSH_STATES } from './sessionState.mjs';
 import { lastAssistantMessage } from './transcript.mjs';
 import { summarise } from '../core/summarise.mjs';
 import { seal, open as unseal, generateKey } from '../core/crypto.mjs';
@@ -147,6 +147,31 @@ function nodeFor(key, session) {
 // idle session from a running one; a session is dropped the moment it ends.
 export const sessionStates = new Map();
 
+// The ts of the last actionable event pushed per session. Gating on this, not
+// on a folded state string, is what stops a turn-end Stop being swallowed when
+// the next turn's first tool call lands in the same poll batch.
+const lastPushedTs = new Map();
+
+/**
+ * The newest actionable event per session in a raw batch.
+ *
+ * From the records, not the folded state: fold keeps only the last state, so a
+ * Stop (needs you) followed by a running tool call in the same poll batch
+ * would hide the Stop and the phone would never be told.
+ */
+export function pickActionable(records) {
+  const actionable = new Map();
+  for (const record of records) {
+    const state = stateForEvent(record);
+    if (!PUSH_STATES.has(state)) continue;
+    const current = actionable.get(record.sessionId);
+    if (!current || record.ts > current.ts) {
+      actionable.set(record.sessionId, { state, ts: record.ts });
+    }
+  }
+  return actionable;
+}
+
 // Where each live session is working. A resume must run in the session's own
 // directory: the trust prompt is per-directory, so spawning in the service's
 // cwd asks the user to trust a folder that has nothing to do with the session.
@@ -165,22 +190,23 @@ export async function publish(config, key) {
   }
 
   const sessions = fold(records);
-  for (const session of sessions) {
-    const previous = sessionStates.get(session.sessionId);
 
-    // Queue the push before the node is touched: a finished session is deleted
-    // from /sessions straight away, but the phone still needs to be told.
-    if (shouldPush(previous, session.state)) {
-      // Sent straight from here. The /pushes node existed only so a Cloud
-      // Function could pick it up, and that needs Blaze; the Mac can send
-      // with the user's own messaging-scoped token instead.
-      await pushNow(config, seal(key, payloadFor(session)));
+  const actionable = pickActionable(records);
+
+  for (const session of sessions) {
+    const act = actionable.get(session.sessionId);
+    // Push once per actionable occurrence: a new Stop/Notification has a newer
+    // ts; a lingering state produces no new record, so no repeat.
+    if (act && act.ts > (lastPushedTs.get(session.sessionId) ?? 0)) {
+      lastPushedTs.set(session.sessionId, act.ts);
+      await pushNow(config, seal(key, payloadFor({ ...session, state: act.state })));
     }
 
     if (session.ended) {
       await db.deleteSession(config, session.sessionId);
       sessionStates.delete(session.sessionId);
       sessionCwds.delete(session.sessionId);
+      lastPushedTs.delete(session.sessionId);
     } else {
       await db.putSession(config, session.sessionId, nodeFor(key, session));
       sessionStates.set(session.sessionId, session.state);
