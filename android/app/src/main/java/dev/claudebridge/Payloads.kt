@@ -4,11 +4,20 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** Tolerant on read: the Mac may add fields before this app is updated. */
+/**
+ * Tolerant on read: the Mac may add fields before this app is updated, and
+ * older nodes written by an earlier bridge are still sitting in the database.
+ *
+ * coerceInputValues matters more than it looks. Without it an explicit JSON
+ * null for a non-nullable property throws, even when the property has a
+ * default — so one legacy node with "branch": null made the whole session
+ * vanish from the list with nothing logged and nothing shown.
+ */
 val BridgeJson = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
     explicitNulls = false
+    coerceInputValues = true
 }
 
 const val PAYLOAD_VERSION = 1

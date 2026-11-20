@@ -216,3 +216,36 @@ class VersionTest {
         assertFalse(isNewer("latest", "0.1.1"))
     }
 }
+
+/**
+ * Payloads already in the database, written by earlier versions of the bridge.
+ *
+ * A null for a non-nullable field used to throw, and the caller turned that
+ * into a dropped list entry — twelve of thirteen sessions disappeared from the
+ * phone with no error anywhere.
+ */
+class LegacyPayloadTest {
+    @Test
+    fun `nulls in optional fields fall back to defaults`() {
+        val json = """
+            {"sessionId":"sess-1","project":"api","branch":null,
+             "state":"waiting_input","summary":"Needs you.","tool":null,"ts":1763600000000}
+        """.trimIndent()
+
+        val session = BridgeJson.decodeFromString<SessionPayload>(json)
+
+        assertEquals("sess-1", session.sessionId)
+        assertEquals("", session.branch)
+        assertEquals("", session.tool)
+        assertTrue(session.needsAttention)
+    }
+
+    @Test
+    fun `unknown fields from a newer bridge are ignored`() {
+        val json = """
+            {"sessionId":"sess-2","state":"done","turn":14,"somethingNew":{"a":1}}
+        """.trimIndent()
+
+        assertEquals("sess-2", BridgeJson.decodeFromString<SessionPayload>(json).sessionId)
+    }
+}

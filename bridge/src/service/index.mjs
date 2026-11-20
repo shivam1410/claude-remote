@@ -228,11 +228,33 @@ export function beat(path = HEARTBEAT_PATH) {
 }
 
 /** One full pass: publish state, relay approvals, deliver replies. */
-export async function tick(config, key) {
+export async function tick(config, key, deps = {}) {
+  const {
+    publish: runPublish = publish,
+    relayDecisions: runRelay = relayDecisions,
+    deliverReplies: runDeliver = deliverReplies,
+  } = deps;
   beat();
-  const touched = await publish(config, key);
-  await relayDecisions(config, key);
-  await deliverReplies(config, key);
+
+  // Each stage runs even when an earlier one fails. They are independent, and
+  // letting publish take the others down with it meant one undeployed rule on
+  // the pushes path silently stopped replies being delivered and approvals
+  // being answered — a blocked hook would sit there until it timed out.
+  const errors = [];
+  let touched = 0;
+  for (const [name, run] of [
+    ['publish', async () => { touched = await runPublish(config, key); }],
+    ['relayDecisions', () => runRelay(config, key)],
+    ['deliverReplies', () => runDeliver(config, key)],
+  ]) {
+    try {
+      await run();
+    } catch (error) {
+      errors.push(`${name}: ${error.message}`);
+    }
+  }
+
+  if (errors.length > 0) throw new Error(errors.join('; '));
   return touched;
 }
 
