@@ -4,9 +4,10 @@ import java.security.GeneralSecurityException
 import java.util.Base64
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
@@ -183,5 +184,35 @@ class WireFormatTest {
         val json = BridgeJson.parseToJsonElement(Crypto.openToString(key, blob)).jsonObject
 
         assertEquals("allow", json["decision"]!!.jsonPrimitive.content)
+    }
+}
+
+/**
+ * Version comparison decides whether an update is offered at all.
+ *
+ * The failure that matters is a false negative: a real update that never
+ * appears, leaving a phone stuck on a broken build with no way forward.
+ */
+class VersionTest {
+    @Test
+    fun `newer patch and minor and major are offered`() {
+        assertTrue(isNewer("v0.1.2", "0.1.1"))
+        assertTrue(isNewer("v0.2.0", "0.1.9"))
+        assertTrue(isNewer("v1.0.0", "0.99.99"))
+    }
+
+    @Test
+    fun `same or older is not offered`() {
+        assertFalse(isNewer("v0.1.1", "0.1.1"))
+        assertFalse(isNewer("v0.1.0", "0.1.1"))
+        assertFalse(isNewer("0.1.1", "v0.1.1"))
+    }
+
+    @Test
+    fun `ragged and junk versions do not crash`() {
+        assertTrue(isNewer("v0.2", "0.1.9"))
+        assertFalse(isNewer("v0.1", "0.1.0"))
+        // A tag that is not a version must not read as newer than anything.
+        assertFalse(isNewer("latest", "0.1.1"))
     }
 }

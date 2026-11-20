@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 13+ asks before any notification is shown. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Pairing only: the camera reads the QR the Mac prints and nothing else. -->
     <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Installing an update from GitHub Releases. Android still shows its own
+         consent screen the first time; this only makes the app eligible to ask. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
@@ -26,6 +31,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- zxing declares this activity as sensorLandscape in its own
+             manifest, which no ScanOptions flag can override. Scanning a QR
+             held in either hand should follow the phone, not force a turn. -->
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            android:screenOrientation="fullSensor"
+            android:stateNotNeeded="true"
+            android:theme="@style/zxing_CaptureTheme"
+            tools:replace="android:screenOrientation" />
+
+        <receiver
+            android:name=".InstallReceiver"
+            android:exported="false" />
 
         <service
             android:name=".BridgeMessagingService"

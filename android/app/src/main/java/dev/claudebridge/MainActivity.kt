@@ -59,6 +59,11 @@ fun BridgeApp(initialSessionId: String?) {
     var selected by remember { mutableStateOf(initialSessionId) }
 
     val configured = remember { Auth.configured(context) }
+    val updateState by Updater.state.collectAsStateWithLifecycle()
+
+    // One quiet check per launch. It only surfaces when something is ready,
+    // so a normal start shows nothing.
+    LaunchedEffect(Unit) { Updater.check(context) }
 
     // Android 13+ shows nothing at all without this, and the whole point is
     // the notification. Asked once, on first launch.
@@ -106,6 +111,9 @@ fun BridgeApp(initialSessionId: String?) {
             paired = paired,
             error = error,
             busy = busy,
+            updateState = updateState,
+            onCheckUpdate = { Updater.check(context, manual = true) },
+            onInstallUpdate = { Updater.install(context) },
             onSignIn = {
                 busy = true
                 error = null
@@ -139,6 +147,9 @@ fun BridgeApp(initialSessionId: String?) {
             paired = false,
             error = "Pairing is incomplete. Scan the QR again.",
             busy = false,
+            updateState = updateState,
+            onCheckUpdate = { Updater.check(context, manual = true) },
+            onInstallUpdate = { Updater.install(context) },
             onSignIn = {},
             onScan = {
                 scanner.launch(ScanOptions().setOrientationLocked(false).setBeepEnabled(false))
@@ -173,6 +184,9 @@ fun BridgeApp(initialSessionId: String?) {
                 paired = false
                 selected = null
             },
+            updateState = updateState,
+            onCheckUpdate = { Updater.check(context, manual = true) },
+            onInstallUpdate = { Updater.install(context) },
         )
     }
 }

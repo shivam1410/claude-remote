@@ -20,6 +20,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -39,6 +40,44 @@ import androidx.compose.ui.unit.dp
 import java.text.DateFormat
 import java.util.Date
 
+/**
+ * Update status and the manual check, shown on every screen.
+ *
+ * Deliberately available before pairing too: the setup screen is exactly where
+ * someone sits when a build is broken, and that is when they most need to pull
+ * a newer one.
+ */
+@Composable
+fun UpdateRow(state: UpdateState, onCheck: () -> Unit, onInstall: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        when (state) {
+            is UpdateState.Idle -> TextButton(onClick = onCheck) { Text("Check for updates") }
+            is UpdateState.Checking -> Text("Checking for updates…", style = MaterialTheme.typography.labelMedium)
+            is UpdateState.Downloading -> {
+                Text("Downloading ${state.tag}…", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = { state.fraction },
+                    modifier = Modifier.fillMaxWidth(0.7f),
+                )
+            }
+            is UpdateState.Ready -> {
+                Text("${state.tag} is ready to install", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(6.dp))
+                Button(onClick = onInstall) { Text("Install ${state.tag}") }
+            }
+            is UpdateState.UpToDate -> {
+                Text("Up to date (v${state.version})", style = MaterialTheme.typography.labelMedium)
+                TextButton(onClick = onCheck) { Text("Check again") }
+            }
+            is UpdateState.Failed -> {
+                Text(state.reason, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
+                TextButton(onClick = onCheck) { Text("Try again") }
+            }
+        }
+    }
+}
+
 /** The one screen shown before pairing is complete. */
 @Composable
 fun SetupScreen(
@@ -47,6 +86,9 @@ fun SetupScreen(
     paired: Boolean,
     error: String?,
     busy: Boolean,
+    updateState: UpdateState,
+    onCheckUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
     onSignIn: () -> Unit,
     onScan: () -> Unit,
 ) {
@@ -89,6 +131,9 @@ fun SetupScreen(
             Spacer(Modifier.height(16.dp))
             Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         }
+
+        Spacer(Modifier.height(32.dp))
+        UpdateRow(updateState, onCheckUpdate, onInstallUpdate)
     }
 }
 
@@ -100,6 +145,9 @@ fun SessionListScreen(
     onOpen: (SessionPayload) -> Unit,
     onDecide: (ApprovalPayload, Boolean) -> Unit,
     onUnpair: () -> Unit,
+    updateState: UpdateState,
+    onCheckUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -131,6 +179,11 @@ fun SessionListScreen(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
+            }
+
+            item {
+                Spacer(Modifier.height(16.dp))
+                UpdateRow(updateState, onCheckUpdate, onInstallUpdate)
             }
         }
     }
