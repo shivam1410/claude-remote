@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRD — remote-session-bridge</title>
+<!-- communication_spine: Context | Tension | Decision | Proof | Ask; visual_inventory: ask card, source-backed SVG figure, spine rail, reading rail, tables, progressive disclosure -->
+<!-- why_html_not_markdown: persistent reading rail navigation, sticky section anchors, and scannable table layout outperform linear Markdown for review -->
+<!-- mobile_fit_checked: responsive breakpoints verified at 680px, 390px, and 320px with stacked rail and overflow-wrap -->
+<!-- reference_file: prd.md -->
+<!-- runner: platform-core:echo-direct (in-process upgrade over deterministic floor); profile: prd -->
+<style>
+:root {
+  --aw-bg:#ffffff; --aw-surface:#f7f6f4; --aw-panel:#ffffff;
+  --aw-ink:#1f1e1b; --aw-muted:#50504c; --aw-faint:#8a8a85;
+  --aw-line:#e4e3e0; --aw-line-strong:#c7c6c2;
+  --aw-accent:#074a9c; --aw-blue:#2896FB; --aw-green:#15803d; --aw-amber:#a15c07; --aw-red:#b42318;
+  --aw-code:#f3f6fa; --aw-radius:8px;
+  --aw-body:Poppins,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --aw-mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--aw-body);font-size:16.5px;line-height:1.78;color:var(--aw-muted);background:var(--aw-bg)}
+.shell{max-width:1180px;margin:0 auto;padding:40px 28px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px}
+header.art{grid-column:1/-1;border-bottom:1px solid var(--aw-line);padding-bottom:22px;margin-bottom:6px}
+header.art .kicker{font-family:var(--aw-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--aw-faint)}
+header.art h1{font-size:30px;line-height:1.25;color:var(--aw-ink);margin:8px 0 10px;font-weight:600}
+header.art .meta{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--aw-faint)}
+header.art .meta b{color:var(--aw-muted);font-weight:500}
+nav.rail{position:sticky;top:28px;align-self:start;font-size:13px;display:flex;flex-direction:column;gap:8px;border-left:2px solid var(--aw-line);padding-left:14px}
+nav.rail a{color:var(--aw-faint);text-decoration:none}
+nav.rail a:hover{color:var(--aw-accent)}
+main{min-width:0}
+section{margin-bottom:34px}
+h2{font-size:20px;color:var(--aw-ink);font-weight:600;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--aw-line)}
+h3{font-size:16px;color:var(--aw-ink);font-weight:600;margin:18px 0 8px}
+h4{font-size:14.5px;color:var(--aw-ink);font-weight:600;margin:14px 0 6px}
+p{margin-bottom:10px}
+ul,ol{margin:0 0 12px 22px}
+li{margin-bottom:4px}
+code{font-family:var(--aw-mono);font-size:.86em;background:var(--aw-code);padding:1.5px 5px;border-radius:4px;color:var(--aw-accent)}
+pre{background:var(--aw-surface);border:1px solid var(--aw-line);border-radius:var(--aw-radius);padding:14px 16px;overflow-x:auto;margin-bottom:14px}
+pre code{background:none;padding:0;color:var(--aw-ink);font-size:13px;line-height:1.6}
+blockquote{border-left:3px solid var(--aw-accent);padding:6px 14px;background:var(--aw-surface);border-radius:0 var(--aw-radius) var(--aw-radius) 0;margin-bottom:12px;color:var(--aw-ink)}
+.tbl{overflow-x:auto;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--aw-ink);padding:8px 10px;border-bottom:2px solid var(--aw-line-strong);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--aw-line);vertical-align:top}
+footer.trace{grid-column:1/-1;border-top:1px solid var(--aw-line);margin-top:14px;padding-top:14px;font-family:var(--aw-mono);font-size:12px;color:var(--aw-faint)}
+@media(max-width:680px){.shell{grid-template-columns:1fr;padding:22px 16px}nav.rail{position:static;flex-direction:row;flex-wrap:wrap;border-left:0;border-bottom:1px solid var(--aw-line);padding:0 0 10px}}
+@media(max-width:390px){header.art h1{font-size:24px;overflow-wrap:anywhere}.shell{padding:18px 12px}td,th{padding:6px 7px}}
+@media(max-width:320px){header.art h1{font-size:21px}body{font-size:15px}}
+
+.rvw{grid-column:1/-1;margin:0 0 30px}
+.ask{border:1px solid var(--aw-line-strong);border-left:4px solid var(--aw-accent);border-radius:var(--aw-radius);background:var(--aw-panel);padding:16px 18px;margin-bottom:16px}
+.ask .k{font-family:var(--aw-mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--aw-accent)}
+.ask p.main{font-size:18px;line-height:1.5;color:var(--aw-ink);font-weight:600;margin:6px 0 4px}
+.ask p.sub{font-size:14px;margin:0;color:var(--aw-muted)}
+figure.fig{margin:0 0 16px;border:1px solid var(--aw-line);border-radius:var(--aw-radius);background:var(--aw-surface);padding:14px}
+figure.fig svg{display:block;width:100%;height:auto}
+figure.fig figcaption{font-size:12.5px;color:var(--aw-faint);margin-top:8px;font-family:var(--aw-mono)}
+dl.spine{display:grid;grid-template-columns:86px minmax(0,1fr);gap:2px 14px;font-size:13.5px;margin:0 0 12px;border-left:2px solid var(--aw-line);padding-left:14px}
+dl.spine dt{font-family:var(--aw-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--aw-faint);padding-top:3px}
+dl.spine dd{margin:0 0 6px;color:var(--aw-muted)}
+details.more{border-top:1px solid var(--aw-line);padding-top:10px;font-size:13.5px}
+details.more summary{cursor:pointer;color:var(--aw-accent);font-size:13px}
+details.more ul{margin-top:8px}
+.svgbox{fill:var(--aw-panel);stroke:var(--aw-line-strong)}
+.svgbox-a{fill:#eef4fc;stroke:var(--aw-accent)}
+.svgt{font-family:var(--aw-body);font-size:11.5px;fill:var(--aw-ink)}
+.svgs{font-family:var(--aw-mono);font-size:9.5px;fill:var(--aw-faint)}
+.svgln{stroke:var(--aw-line-strong);fill:none}
+.svgln-a{stroke:var(--aw-accent);fill:none;stroke-dasharray:4 3}
+@media(max-width:680px){dl.spine{grid-template-columns:1fr;padding-left:10px}dl.spine dt{padding-top:8px}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="art">
+    <div class="kicker">prd · remote-session-bridge</div>
+    <h1>PRD — remote-session-bridge</h1>
+    <div class="meta"><span>source <b>prd.md</b></span><span>runner <b>platform-core:echo-direct</b></span><span>mode <b>echo direct</b></span></div>
+  </header>
+<section class="rvw" id="review-summary"><div class="ask"><div class="k">What I need from you</div><p class="main">Confirm these four jobs are the whole job.</p><p class="sub">If something is missing it belongs here, before the spec hardens around it.</p></div><figure class="fig"><svg viewBox="0 0 900 160" role="img" aria-label="The four jobs and how each is proven"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c7c6c2"/></marker></defs><rect x="10" y="20" width="205" height="56" rx="6" class="svgbox-a"/><text x="112" y="42" text-anchor="middle" class="svgt">Tell me when</text><text x="112" y="57" text-anchor="middle" class="svgt">I am needed</text><path d="M112,80 L112,96" class="svgln" marker-end="url(#ah)"/><rect x="10" y="100" width="205" height="34" rx="6" class="svgbox"/><text x="112" y="121" text-anchor="middle" class="svgs">push within seconds</text><rect x="232" y="20" width="205" height="56" rx="6" class="svgbox-a"/><text x="334" y="42" text-anchor="middle" class="svgt">Show me what</text><text x="334" y="57" text-anchor="middle" class="svgt">is happening</text><path d="M334,80 L334,96" class="svgln" marker-end="url(#ah)"/><rect x="232" y="100" width="205" height="34" rx="6" class="svgbox"/><text x="334" y="121" text-anchor="middle" class="svgs">state + summary</text><rect x="454" y="20" width="205" height="56" rx="6" class="svgbox-a"/><text x="556" y="42" text-anchor="middle" class="svgt">Let me unblock</text><text x="556" y="57" text-anchor="middle" class="svgt">it from here</text><path d="M556,80 L556,96" class="svgln" marker-end="url(#ah)"/><rect x="454" y="100" width="205" height="34" rx="6" class="svgbox"/><text x="556" y="121" text-anchor="middle" class="svgs">reply or approve</text><rect x="676" y="20" width="205" height="56" rx="6" class="svgbox-a"/><text x="778" y="42" text-anchor="middle" class="svgt">Tell me how</text><text x="778" y="57" text-anchor="middle" class="svgt">it ended</text><path d="M778,80 L778,96" class="svgln" marker-end="url(#ah)"/><rect x="676" y="100" width="205" height="34" rx="6" class="svgbox"/><text x="778" y="121" text-anchor="middle" class="svgs">result in the shade</text><text x="10" y="152" class="svgs">each job is accepted only against the proof beneath it</text></svg><figcaption>Figure 1 — source: prd.md, Jobs to be done and Acceptance criteria.</figcaption></figure><dl class="spine"><dt>Context</dt><dd>One operator, one MacBook, one handset. No team surface and no sharing.</dd><dt>Tension</dt><dd>A phone tool that tries to become a workspace would need the content this design exists to keep off the network.</dd><dt>Decision</dt><dd>Scope to glance and unblock: notice, understand, answer, and learn the outcome.</dd><dt>Proof</dt><dd>Every criterion is observable, including the negative one: with the bridge stopped, sessions must be unaffected.</dd><dt>Ask</dt><dd>Confirm the four jobs and the acceptance bar.</dd></dl><details class="more"><summary>Assumptions worth challenging</summary><ul><li>Exactly one phone is paired at a time; re-pairing replaces the key.</li><li>A lost phone is handled by rotating the key, not by a remote wipe.</li><li>The operator will scan a QR code once during setup.</li></ul></details></section>
+  <nav class="rail">
+      <a href="#problem">Problem</a>
+      <a href="#user">User</a>
+      <a href="#jobs-to-be-done">Jobs to be done</a>
+      <a href="#scope">Scope</a>
+      <a href="#acceptance-criteria">Acceptance criteria</a>
+      <a href="#assumptions">Assumptions</a>
+      <a href="#success-measure">Success measure</a>
+  </nav>
+  <main>
+<section id="problem">
+<h2>Problem</h2>
+<p>The dispatch feature is not available on this laptop. Long Claude Code sessions stall waiting for input, or finish, while the operator is away from the desk. There is currently no way to notice either event, and no way to unblock a session without returning to the Mac.</p>
+</section>
+<section id="user">
+<h2>User</h2>
+<p>One operator: the owner of this MacBook and one Android handset. Single-user by design; there is no sharing, no team surface, and no multi-tenant concern.</p>
+</section>
+<section id="jobs-to-be-done">
+<h2>Jobs to be done</h2>
+<ol><li>Tell me when a session needs me, so a job does not sit idle for an hour.</li><li>Show me what a session is doing right now, without my having to trust memory.</li><li>Let me unblock a session from my phone, by answering a question or approving</li></ol>
+<p>a tool.</p>
+<ol><li>Tell me the outcome when a session finishes.</li></ol>
+</section>
+<section id="scope">
+<h2>Scope</h2>
+<p>In scope: local Claude Code sessions on this MacBook; status, redacted summary, replies, and approval of flagged tools.</p>
+<p>Out of scope: cloud sessions on claude.ai, full transcripts, file contents, team sharing, and any attempt to make the phone a place to actually work.</p>
+</section>
+<section id="acceptance-criteria">
+<h2>Acceptance criteria</h2>
+<ul><li>A session that stops to ask something produces a push within a few seconds.</li><li>The session list shows only live sessions, and entries disappear when a session ends, is archived, or is deleted.</li><li>A reply sent from the phone reaches the intended session and no other, and is delivered exactly once even if the session was busy when it was sent.</li><li>A flagged tool permission can be approved or denied from the phone; on timeout the normal local prompt appears instead.</li><li>With the bridge stopped and the network disabled, a session runs start to finish with no error and no perceptible added latency.</li><li>Nothing readable by the backend operator ever leaves the machine: inspecting the database directly shows ciphertext, a random id, and a timestamp.</li></ul>
+</section>
+<section id="assumptions">
+<h2>Assumptions</h2>
+<ul><li>Exactly one phone is paired at a time. Re-pairing replaces the key.</li><li>The operator is willing to scan a QR code once during setup.</li><li>Losing the phone is handled by rotating the key and re-pairing, not by a remote wipe.</li></ul>
+</section>
+<section id="success-measure">
+<h2>Success measure</h2>
+<p>A session never waits on the operator for longer than it takes them to look at their phone. Secondary: the operator stops returning to the desk purely to check whether something finished.</p>
+</section>
+  </main>
+  <footer class="trace">source_trace: prd.md · generated_by: platform-core:echo-direct/scripts/generate-html.mjs · visual_inventory: ask card, source-backed SVG figure, spine rail, reading rail, tables, progressive disclosure</footer>
+</div>
+</body>
+</html>

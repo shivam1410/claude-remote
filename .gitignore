@@ -1,0 +1,10 @@
+node_modules/
+*.apk
+*.aab
+secrets/
+local.properties
+.DS_Store
+firebase/*.local.json
+bridge/.env
+*.keystore
+google-services.json

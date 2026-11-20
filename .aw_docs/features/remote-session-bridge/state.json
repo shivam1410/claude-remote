@@ -1,0 +1,170 @@
+{
+  "feature_slug": "remote-session-bridge",
+  "stage": "plan",
+  "mode": "full",
+  "status": "ready_for_build",
+  "created_at": "2026-11-20",
+  "artifacts": {
+    "spec.md": "written",
+    "tasks.md": "written",
+    "context.md": "written",
+    "state.json": "written",
+    "prd.md": "written",
+    "design.md": "written"
+  },
+  "key_inputs": [
+    "User request 2026-11-19: dispatch is unavailable; wants phone visibility of session status, whether input is required, and the result, with a Mac-side service that can reply to a specific session.",
+    "User scoping 2026-11-19: local Mac sessions only; native Android app with FCM; full two-way replies.",
+    "User pivot 2026-11-20 (Q3): work Firebase may be unavailable; data must be secured and not readable; a key shared between the Mac and Android identifies the session; archived and deleted sessions are removed.",
+    "Verified 2026-11-19: claude CLI 2.1.316 supports SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Notification, Stop, SubagentStop, SessionEnd, PreCompact.",
+    "Verified 2026-11-19: PreToolUse hooks return hookSpecificOutput.permissionDecision of allow, deny, or ask \u2014 remote approval is mechanically possible.",
+    "Verified 2026-11-19: `claude --bg --resume <id>` continues a session under the same id, but starts a copy if that session is already running.",
+    "Verified 2026-11-19: ~/.claude/settings.json already carries AW telemetry and graphify hooks; new wiring must be additive.",
+    "Verified 2026-11-19: node v22.23.3, npm 10.9.9, gcloud 584, java 17, adb 1.0.41 present; firebase CLI absent."
+  ],
+  "internal_skills_used": [
+    "using-aw-skills",
+    "aw-plan",
+    "grill-with-docs"
+  ],
+  "grill_depth": "3 \u2014 deep grill, user-selected, twelve questions",
+  "assumptions_and_constraints": [
+    "D1 the payload carries a redacted summary, never raw assistant text, and never tool output, file contents, or diffs.",
+    "D2 the summary is heuristic with no model call.",
+    "D3 AES-256-GCM end-to-end; the key never leaves the paired devices.",
+    "D3b personal Firebase project: Realtime Database plus FCM.",
+    "D4 Google sign-in pinned to one account uid on both ends; the Mac refresh token lives in the macOS Keychain.",
+    "D5 a session is removed from the database the moment it ends, is archived, or is deleted.",
+    "D6 a reply sent while a session is busy is queued and delivered on the next idle event.",
+    "D7 remote approval covers flagged tools in enrolled sessions only, with an ask fallback on timeout.",
+    "D8 all active sessions publish; no allowlist.",
+    "D9 hooks always fail open, with a bounded timeout and exit zero.",
+    "D10 push fires on input-needed, finished, and error only.",
+    "D11 the Android app is sideloaded as a debug APK over adb.",
+    "Mac sign-in uses a loopback-redirect OAuth flow rather than device code, because this machine has a browser."
+  ],
+  "confirm_before_build": [
+    "R1: Cloud Functions require the Blaze plan. The alternative is an Android foreground service, trading battery for avoiding an FCM service-account key on the laptop.",
+    "Phase 5.1 must prove `claude --bg --resume` continues rather than forks before the reply path is built on it."
+  ],
+  "risks": [
+    "R1 \u2014 FCM fan-out needs Cloud Functions and therefore billing; the fallback is a foreground service on the handset.",
+    "R2 \u2014 scope spans hooks, a daemon, a cloud function, and an Android app; phases 1 to 5 deliver a usable subset.",
+    "R3 \u2014 heuristic summaries read mechanically on list-shaped or question-shaped messages.",
+    "R4 \u2014 the reply path depends on resume semantics verified from CLI help but not yet exercised end to end."
+  ],
+  "adr_needed": [],
+  "adr_not_needed_because": "The decisions are recorded in spec.md and context.md, and the encryption choice is self-evident from the constraint that the host must not be able to read session content.",
+  "save_point_commit_policy": "One commit per phase. Phases 0 to 2 ship with no remote dependency.",
+  "parallel_build_policy": {
+    "max_parallel_subagents": 3,
+    "parallel_groups": {
+      "core": [
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4",
+        "1.5",
+        "1.6"
+      ]
+    },
+    "note": "Everything outside Phase 1 sequences on shared files or on a prior phase's output."
+  },
+  "security_notes": [
+    "Egress boundary: only a scrubbed summary, a random session id, a timestamp, and an FCM token ever leave the machine; everything else is ciphertext.",
+    "nhi7 and nhi5 honoured: no long-lived service-account key on the laptop, and no Admin SDK privilege that would bypass database rules.",
+    "AES-GCM is authenticated, so a forged reply cannot be decrypted and is discarded before reaching a session.",
+    "Rules pin reads and writes to the signed-in uid; encryption, not the rules, is the confidentiality control."
+  ],
+  "validation_commands": [
+    "cd bridge && node --test",
+    "run a session with the bridge stopped and the network disabled \u2014 must complete normally",
+    "aw docs validate --feature remote-session-bridge --full  # passed 2026-11-20"
+  ],
+  "recommended_next_commands": [
+    "/aw:build \u2014 start at Phase 0",
+    "/aw:review \u2014 if the plan should be reviewed before implementation"
+  ],
+  "inputs_used": [
+    "context.md",
+    "prd.md",
+    "design.md",
+    "spec.md",
+    "tasks.md"
+  ],
+  "blockers": [],
+  "html_companion_artifacts": [
+    {
+      "source_path": ".aw_docs/features/remote-session-bridge/spec.md",
+      "html_path": ".aw_docs/features/remote-session-bridge/spec.html",
+      "profile": "spec",
+      "status": "generated",
+      "owner": "platform-core:human-collaboration-artifacts",
+      "execution_mode": "skill",
+      "runner": "platform-core:echo-direct",
+      "echo_agent_status": "in_process_fast_path",
+      "publish_status": "blocked",
+      "remote_links": null,
+      "publish_skip_reason": "Publishing sends the packet to the org docs registry. The user did not request sharing, and this is a personal tool, so consent is pending.",
+      "publish_blocker": "No git remote on target workspace; org-registry publish not consented by user."
+    },
+    {
+      "source_path": ".aw_docs/features/remote-session-bridge/tasks.md",
+      "html_path": ".aw_docs/features/remote-session-bridge/tasks.html",
+      "profile": "tasks",
+      "status": "generated",
+      "owner": "platform-core:human-collaboration-artifacts",
+      "execution_mode": "skill",
+      "runner": "platform-core:echo-direct",
+      "echo_agent_status": "in_process_fast_path",
+      "publish_status": "blocked",
+      "remote_links": null,
+      "publish_skip_reason": "Publishing sends the packet to the org docs registry. The user did not request sharing, and this is a personal tool, so consent is pending.",
+      "publish_blocker": "No git remote on target workspace; org-registry publish not consented by user."
+    },
+    {
+      "source_path": ".aw_docs/features/remote-session-bridge/context.md",
+      "html_path": ".aw_docs/features/remote-session-bridge/context.html",
+      "profile": "context",
+      "status": "generated",
+      "owner": "platform-core:human-collaboration-artifacts",
+      "execution_mode": "skill",
+      "runner": "platform-core:echo-direct",
+      "echo_agent_status": "in_process_fast_path",
+      "publish_status": "blocked",
+      "remote_links": null,
+      "publish_skip_reason": "Publishing sends the packet to the org docs registry. The user did not request sharing, and this is a personal tool, so consent is pending.",
+      "publish_blocker": "No git remote on target workspace; org-registry publish not consented by user."
+    },
+    {
+      "source_path": ".aw_docs/features/remote-session-bridge/prd.md",
+      "html_path": ".aw_docs/features/remote-session-bridge/prd.html",
+      "profile": "prd",
+      "status": "generated",
+      "owner": "platform-core:human-collaboration-artifacts",
+      "execution_mode": "skill",
+      "runner": "platform-core:echo-direct",
+      "echo_agent_status": "in_process_fast_path",
+      "publish_status": "blocked",
+      "remote_links": null,
+      "publish_skip_reason": "Publishing sends the packet to the org docs registry. The user did not request sharing, and this is a personal tool, so consent is pending.",
+      "publish_blocker": "No git remote on target workspace; org-registry publish not consented by user."
+    },
+    {
+      "source_path": ".aw_docs/features/remote-session-bridge/design.md",
+      "html_path": ".aw_docs/features/remote-session-bridge/design.html",
+      "profile": "design",
+      "status": "generated",
+      "owner": "platform-core:human-collaboration-artifacts",
+      "execution_mode": "skill",
+      "runner": "platform-core:echo-direct",
+      "echo_agent_status": "in_process_fast_path",
+      "publish_status": "blocked",
+      "remote_links": null,
+      "publish_skip_reason": "Publishing sends the packet to the org docs registry. The user did not request sharing, and this is a personal tool, so consent is pending.",
+      "publish_blocker": "No git remote on target workspace; org-registry publish not consented by user."
+    }
+  ],
+  "publish_status": "blocked",
+  "publish_blocker": "Target workspace /Users/shivamhl/Shivam/Remote-claude had no git remote at plan time and the user has not consented to pushing this personal-tool packet to the org docs registry. Publish is withheld pending explicit user consent."
+}

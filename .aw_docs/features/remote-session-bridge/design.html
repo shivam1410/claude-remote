@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design — remote-session-bridge</title>
+<!-- communication_spine: Context | Tension | Decision | Proof | Ask; visual_inventory: ask card, source-backed SVG figure, spine rail, reading rail, tables, progressive disclosure -->
+<!-- why_html_not_markdown: persistent reading rail navigation, sticky section anchors, and scannable table layout outperform linear Markdown for review -->
+<!-- mobile_fit_checked: responsive breakpoints verified at 680px, 390px, and 320px with stacked rail and overflow-wrap -->
+<!-- reference_file: design.md -->
+<!-- runner: platform-core:echo-direct (in-process upgrade over deterministic floor); profile: design -->
+<style>
+:root {
+  --aw-bg:#ffffff; --aw-surface:#f7f6f4; --aw-panel:#ffffff;
+  --aw-ink:#1f1e1b; --aw-muted:#50504c; --aw-faint:#8a8a85;
+  --aw-line:#e4e3e0; --aw-line-strong:#c7c6c2;
+  --aw-accent:#074a9c; --aw-blue:#2896FB; --aw-green:#15803d; --aw-amber:#a15c07; --aw-red:#b42318;
+  --aw-code:#f3f6fa; --aw-radius:8px;
+  --aw-body:Poppins,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --aw-mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--aw-body);font-size:16.5px;line-height:1.78;color:var(--aw-muted);background:var(--aw-bg)}
+.shell{max-width:1180px;margin:0 auto;padding:40px 28px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px}
+header.art{grid-column:1/-1;border-bottom:1px solid var(--aw-line);padding-bottom:22px;margin-bottom:6px}
+header.art .kicker{font-family:var(--aw-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--aw-faint)}
+header.art h1{font-size:30px;line-height:1.25;color:var(--aw-ink);margin:8px 0 10px;font-weight:600}
+header.art .meta{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--aw-faint)}
+header.art .meta b{color:var(--aw-muted);font-weight:500}
+nav.rail{position:sticky;top:28px;align-self:start;font-size:13px;display:flex;flex-direction:column;gap:8px;border-left:2px solid var(--aw-line);padding-left:14px}
+nav.rail a{color:var(--aw-faint);text-decoration:none}
+nav.rail a:hover{color:var(--aw-accent)}
+main{min-width:0}
+section{margin-bottom:34px}
+h2{font-size:20px;color:var(--aw-ink);font-weight:600;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--aw-line)}
+h3{font-size:16px;color:var(--aw-ink);font-weight:600;margin:18px 0 8px}
+h4{font-size:14.5px;color:var(--aw-ink);font-weight:600;margin:14px 0 6px}
+p{margin-bottom:10px}
+ul,ol{margin:0 0 12px 22px}
+li{margin-bottom:4px}
+code{font-family:var(--aw-mono);font-size:.86em;background:var(--aw-code);padding:1.5px 5px;border-radius:4px;color:var(--aw-accent)}
+pre{background:var(--aw-surface);border:1px solid var(--aw-line);border-radius:var(--aw-radius);padding:14px 16px;overflow-x:auto;margin-bottom:14px}
+pre code{background:none;padding:0;color:var(--aw-ink);font-size:13px;line-height:1.6}
+blockquote{border-left:3px solid var(--aw-accent);padding:6px 14px;background:var(--aw-surface);border-radius:0 var(--aw-radius) var(--aw-radius) 0;margin-bottom:12px;color:var(--aw-ink)}
+.tbl{overflow-x:auto;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--aw-ink);padding:8px 10px;border-bottom:2px solid var(--aw-line-strong);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--aw-line);vertical-align:top}
+footer.trace{grid-column:1/-1;border-top:1px solid var(--aw-line);margin-top:14px;padding-top:14px;font-family:var(--aw-mono);font-size:12px;color:var(--aw-faint)}
+@media(max-width:680px){.shell{grid-template-columns:1fr;padding:22px 16px}nav.rail{position:static;flex-direction:row;flex-wrap:wrap;border-left:0;border-bottom:1px solid var(--aw-line);padding:0 0 10px}}
+@media(max-width:390px){header.art h1{font-size:24px;overflow-wrap:anywhere}.shell{padding:18px 12px}td,th{padding:6px 7px}}
+@media(max-width:320px){header.art h1{font-size:21px}body{font-size:15px}}
+
+.rvw{grid-column:1/-1;margin:0 0 30px}
+.ask{border:1px solid var(--aw-line-strong);border-left:4px solid var(--aw-accent);border-radius:var(--aw-radius);background:var(--aw-panel);padding:16px 18px;margin-bottom:16px}
+.ask .k{font-family:var(--aw-mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--aw-accent)}
+.ask p.main{font-size:18px;line-height:1.5;color:var(--aw-ink);font-weight:600;margin:6px 0 4px}
+.ask p.sub{font-size:14px;margin:0;color:var(--aw-muted)}
+figure.fig{margin:0 0 16px;border:1px solid var(--aw-line);border-radius:var(--aw-radius);background:var(--aw-surface);padding:14px}
+figure.fig svg{display:block;width:100%;height:auto}
+figure.fig figcaption{font-size:12.5px;color:var(--aw-faint);margin-top:8px;font-family:var(--aw-mono)}
+dl.spine{display:grid;grid-template-columns:86px minmax(0,1fr);gap:2px 14px;font-size:13.5px;margin:0 0 12px;border-left:2px solid var(--aw-line);padding-left:14px}
+dl.spine dt{font-family:var(--aw-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--aw-faint);padding-top:3px}
+dl.spine dd{margin:0 0 6px;color:var(--aw-muted)}
+details.more{border-top:1px solid var(--aw-line);padding-top:10px;font-size:13.5px}
+details.more summary{cursor:pointer;color:var(--aw-accent);font-size:13px}
+details.more ul{margin-top:8px}
+.svgbox{fill:var(--aw-panel);stroke:var(--aw-line-strong)}
+.svgbox-a{fill:#eef4fc;stroke:var(--aw-accent)}
+.svgt{font-family:var(--aw-body);font-size:11.5px;fill:var(--aw-ink)}
+.svgs{font-family:var(--aw-mono);font-size:9.5px;fill:var(--aw-faint)}
+.svgln{stroke:var(--aw-line-strong);fill:none}
+.svgln-a{stroke:var(--aw-accent);fill:none;stroke-dasharray:4 3}
+@media(max-width:680px){dl.spine{grid-template-columns:1fr;padding-left:10px}dl.spine dt{padding-top:8px}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="art">
+    <div class="kicker">design · remote-session-bridge</div>
+    <h1>Design — remote-session-bridge</h1>
+    <div class="meta"><span>source <b>design.md</b></span><span>runner <b>platform-core:echo-direct</b></span><span>mode <b>echo direct</b></span></div>
+  </header>
+<section class="rvw" id="review-summary"><div class="ask"><div class="k">What I need from you</div><p class="main">Approve the three screens, or name what is missing.</p><p class="sub">The absent features are deliberate, not unbuilt. Each one would breach the egress rule.</p></div><figure class="fig"><svg viewBox="0 0 900 200" role="img" aria-label="Pairing, list, and detail screens"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c7c6c2"/></marker></defs><rect x="30" y="15" width="150" height="150" rx="10" class="svgbox"/><rect x="30" y="15" width="150" height="26" rx="10" class="svgbox-a"/><text x="105" y="33" text-anchor="middle" class="svgt">Pair</text><rect x="40" y="54" width="130" height="24" rx="4" class="svgbox"/><text x="105" y="70" text-anchor="middle" class="svgs">sign in</text><rect x="40" y="86" width="130" height="24" rx="4" class="svgbox"/><text x="105" y="102" text-anchor="middle" class="svgs">scan QR</text><rect x="40" y="118" width="130" height="24" rx="4" class="svgbox"/><text x="105" y="134" text-anchor="middle" class="svgs">key to Keystore</text><path d="M182,90 L256,90" class="svgln" marker-end="url(#ah)"/><rect x="260" y="15" width="150" height="150" rx="10" class="svgbox"/><rect x="260" y="15" width="150" height="26" rx="10" class="svgbox-a"/><text x="335" y="33" text-anchor="middle" class="svgt">Session list</text><rect x="270" y="54" width="130" height="24" rx="4" class="svgbox"/><text x="335" y="70" text-anchor="middle" class="svgs">needs-you pinned</text><rect x="270" y="86" width="130" height="24" rx="4" class="svgbox"/><text x="335" y="102" text-anchor="middle" class="svgs">state chip</text><rect x="270" y="118" width="130" height="24" rx="4" class="svgbox"/><text x="335" y="134" text-anchor="middle" class="svgs">summary line</text><path d="M412,90 L486,90" class="svgln" marker-end="url(#ah)"/><rect x="490" y="15" width="150" height="150" rx="10" class="svgbox"/><rect x="490" y="15" width="150" height="26" rx="10" class="svgbox-a"/><text x="565" y="33" text-anchor="middle" class="svgt">Detail</text><rect x="500" y="54" width="130" height="24" rx="4" class="svgbox"/><text x="565" y="70" text-anchor="middle" class="svgs">approve / deny</text><rect x="500" y="86" width="130" height="24" rx="4" class="svgbox"/><text x="565" y="102" text-anchor="middle" class="svgs">reply box</text><rect x="500" y="118" width="130" height="24" rx="4" class="svgbox"/><text x="565" y="134" text-anchor="middle" class="svgs">queued -> delivered</text><text x="720" y="60" class="svgs">notification</text><text x="720" y="76" class="svgs">taps straight</text><text x="720" y="92" class="svgs">into Detail</text><path d="M718,100 L640,110" class="svgln-a" marker-end="url(#ah)"/><text x="30" y="188" class="svgs">no transcript view, no file browser — anything that pulls content off the machine is out by D1</text></svg><figcaption>Figure 1 — source: design.md, Screens and Notifications.</figcaption></figure><dl class="spine"><dt>Context</dt><dd>The phone is reached for in a queue or on a sofa, one-handed, for a few seconds.</dd><dt>Tension</dt><dd>Showing enough to decide, while holding nothing worth stealing on the handset or the wire.</dd><dt>Decision</dt><dd>Three screens, one dominant action per state, and notifications composed locally after decryption.</dd><dt>Proof</dt><dd>The finished notification is the only place a completed session's result survives, which follows directly from D5 pruning the entry.</dd><dt>Ask</dt><dd>Approve the screen set.</dd></dl><details class="more"><summary>Interaction rules that exist for a reason</summary><ul><li>A queued reply reads as queued, never as sent, so you are never misled about what the session has seen.</li><li>A decryption failure renders explicitly, because a silent blank would hide a key mismatch.</li><li>Controls disable while a send is in flight, so a double tap cannot send twice.</li></ul></details></section>
+  <nav class="rail">
+      <a href="#overview">Overview</a>
+      <a href="#screens">Screens</a>
+      <a href="#interaction-rules">Interaction rules</a>
+      <a href="#what-is-deliberately-absent">What is deliberately absent</a>
+  </nav>
+  <main>
+<section id="overview">
+<h2>Overview</h2>
+<p>The phone is a glance-and-unblock surface, not a workspace. Every screen is built so the common case — &quot;something needs me&quot; — is answerable in one tap.</p>
+</section>
+<section id="screens">
+<h2>Screens</h2>
+<h3 id="1-pairing-first-run-only">1. Pairing (first run only)</h3>
+<p>Google sign-in with the pinned account, then a camera view to scan the QR shown by <code>bridge --pair</code> on the Mac. On success the key is written to the Android Keystore and the screen is never shown again unless the operator re-pairs.</p>
+<h3 id="2-session-list">2. Session list</h3>
+<p>The home screen. One row per live session, sorted with sessions that need attention pinned to the top.</p>
+<p>Each row shows the project name, a state chip, and the summary line. State chips are the primary visual signal:</p>
+<div class="tbl"><table><thead><tr><th>State</th><th>Treatment</th></tr></thead><tbody><tr><td><code>waiting_input</code></td><td>Accent colour, pinned to the top of the list</td></tr><tr><td><code>waiting_approval</code></td><td>Accent colour, pinned, with the tool name shown</td></tr><tr><td><code>running</code></td><td>Muted, with a subtle progress indicator</td></tr><tr><td><code>error</code></td><td>Error colour, pinned</td></tr></tbody></table></div>
+<p>An empty list is a good state, and says so plainly rather than showing a spinner.</p>
+<h3 id="3-session-detail">3. Session detail</h3>
+<p>Project, branch, state, turn count, and the summary in full. Below it, the action area, which changes with state:</p>
+<ul><li><code>waiting_approval</code> — Approve and Deny as the two dominant buttons, with the tool named above them.</li><li><code>waiting_input</code> — a reply box with send.</li><li><code>running</code> — the reply box remains available, and sending shows a &quot;queued&quot; state, which becomes &quot;delivered&quot; once the bridge injects it.</li></ul>
+<h3 id="4-notifications">4. Notifications</h3>
+<p>Built locally on the handset after decrypting the data message, because the server cannot read the content. Three categories, matching D10: input needed, finished, and error. Tapping one opens that session's detail screen directly.</p>
+<p>The finished notification carries the result summary, and deliberately persists in the notification shade after the database entry is pruned. That is the only place a completed session's result survives, which is a direct consequence of D5.</p>
+</section>
+<section id="interaction-rules">
+<h2>Interaction rules</h2>
+<ul><li>Reply and approval controls are disabled while a send is in flight, so a double tap cannot send twice.</li><li>A queued reply is shown as queued, never as sent, so the operator is never misled about whether the session has seen it.</li><li>A decryption failure renders as an explicit &quot;cannot decrypt&quot; row rather than as empty content, because silent blanks would hide a key mismatch.</li></ul>
+</section>
+<section id="what-is-deliberately-absent">
+<h2>What is deliberately absent</h2>
+<p>No transcript view, no file browser, no diff viewer, no settings beyond re-pairing. Each of these would pull content out of the machine that D1 prohibits, and none of them serve the job of unblocking a stalled session.</p>
+</section>
+  </main>
+  <footer class="trace">source_trace: design.md · generated_by: platform-core:echo-direct/scripts/generate-html.mjs · visual_inventory: ask card, source-backed SVG figure, spine rail, reading rail, tables, progressive disclosure</footer>
+</div>
+</body>
+</html>
