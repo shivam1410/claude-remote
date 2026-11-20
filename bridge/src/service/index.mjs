@@ -169,7 +169,11 @@ export async function deliverReplies(config, key, deps = {}) {
   let delivered = 0;
   for (const [pushId, node] of Object.entries(pending)) {
     const payload = decode(key, node);
-    const { action } = classify(payload, sessionStates);
+    const { action, reason } = classify(payload, sessionStates);
+    // Every decision leaves a trace. A reply that was written and then
+    // silently dropped is indistinguishable from one that was never sent,
+    // and that ambiguity cost an evening.
+    console.log(`reply ${pushId}: ${action} (${reason})${payload ? ` -> ${payload.sessionId}` : ''}`);
 
     if (action === 'queue') continue;
     if (action === 'deliver') {
@@ -177,6 +181,7 @@ export async function deliverReplies(config, key, deps = {}) {
       // reason to wait: resuming a busy session forks it.
       const live = await status(payload.sessionId);
       if (live !== 'idle') {
+        console.log(`reply ${pushId}: holding, CLI reports ${live ?? 'unknown'}`);
         if (live === 'gone') {
           // The session is not running at all, so resuming cannot continue
           // it. Hold rather than start something nobody asked for.
@@ -201,6 +206,7 @@ export async function deliverReplies(config, key, deps = {}) {
         throw error;
       }
       delivered += 1;
+      console.log(`reply ${pushId}: resumed ${payload.sessionId}`);
       // The session is no longer idle; hold the rest of this batch for it.
       sessionStates.set(payload.sessionId, 'running');
     }

@@ -414,6 +414,7 @@ fun SessionDetailScreen(
     queued: List<QueuedReply>,
     onBack: () -> Unit,
     onReply: (String) -> Unit,
+    sendError: String? = null,
 ) {
     var text by remember { mutableStateOf("") }
 
@@ -428,7 +429,7 @@ fun SessionDetailScreen(
                 },
             )
         },
-        bottomBar = { ReplyBar(session, onReply) },
+        bottomBar = { ReplyBar(session, onReply, sendError) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -497,7 +498,7 @@ fun SessionDetailScreen(
 
 /** Text field and send button, same height, side by side. */
 @Composable
-private fun ReplyBar(session: SessionPayload, onReply: (String) -> Unit) {
+private fun ReplyBar(session: SessionPayload, onReply: (String) -> Unit, sendError: String?) {
     var text by remember(session.sessionId) { mutableStateOf("") }
     val canSend = text.isNotBlank()
 
@@ -509,6 +510,15 @@ private fun ReplyBar(session: SessionPayload, onReply: (String) -> Unit) {
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
+        if (sendError != null) {
+            Text(
+                sendError,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
+        }
+
         if (!session.needsAttention) {
             // The Mac holds a reply until the session is idle, because
             // resuming a running one forks the conversation.

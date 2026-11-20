@@ -69,8 +69,14 @@ class Repo(private val uid: String, private val key: SecretKey, databaseUrl: Str
         }
     }
 
-    /** Queue a reply. The Mac delivers it when that session is next idle. */
-    suspend fun reply(sessionId: String, text: String) {
+    /**
+     * Queue a reply. The Mac delivers it when that session is next idle.
+     *
+     * Returns a Result so a failed write can be shown. Firebase queues writes
+     * offline and the await only completes once the server has them, so a
+     * failure here genuinely means the message is not in the database.
+     */
+    suspend fun reply(sessionId: String, text: String): Result<Unit> = runCatching {
         val payload = ReplyPayload(sessionId = sessionId, text = text, ts = System.currentTimeMillis())
         root.child("replies").push().setValue(
             mapOf(
@@ -79,6 +85,7 @@ class Repo(private val uid: String, private val key: SecretKey, databaseUrl: Str
                 "blob" to Crypto.seal(key, BridgeJson.encodeToString(payload)),
             ),
         ).await()
+        Unit
     }
 
     /**
