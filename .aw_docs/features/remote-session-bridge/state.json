@@ -2,7 +2,7 @@
   "feature_slug": "remote-session-bridge",
   "stage": "build",
   "mode": "full",
-  "status": "phases_0_2_complete",
+  "status": "phase_3_code_complete_awaiting_config",
   "created_at": "2026-11-20",
   "artifacts": {
     "spec.md": "written",
@@ -171,19 +171,22 @@
     "completed": [
       "Phase 0 scaffold",
       "Phase 1 pure core + tests",
-      "Phase 2 hook emitter + settings wiring"
+      "Phase 2 hook emitter + settings wiring",
+      "Phase 3 service code (rules, config, keychain, OAuth, RTDB REST, spool drain)"
     ],
-    "next": "Phase 3 \u2014 Firebase project (manual user step) then bridge service",
+    "next": "Fill ~/.claude-bridge/config.json, run auth.mjs --login, then verify an encrypted node appears",
     "evidence": {
-      "tests": "25/25 green via `node --test test/*.test.mjs` in bridge/",
+      "tests": "50/50 green via `node --test test/*.test.mjs` in bridge/",
       "live_hook_proof": "SessionStart and SessionEnd records spooled from a real `claude -p` run on 2026-11-20",
       "hook_latency_ms": "~45 per event, measured over 3 runs",
-      "settings_backup": "~/.claude/settings.json.bak-20261120-101253"
+      "settings_backup": "~/.claude/settings.json.bak-20261120-101253",
+      "offline_pipeline_smoke": "fold -> summarise -> seal -> open round trip produced a 225-byte blob and a correct decrypted payload on 2026-11-20"
     },
     "open_decisions": [
       "R1 \u2014 Cloud Functions on Blaze vs Android foreground service",
       "R4 \u2014 resume-vs-fork spike at task 5.1"
-    ]
+    ],
+    "not_verified": "No live Firebase call has been made: the project config is not filled in yet, so auth, rules, and database writes are unproven end to end."
   },
-  "updated_at": "2026-11-20T10:13:37+0530"
+  "updated_at": "2026-11-20T13:38:22+0530"
 }

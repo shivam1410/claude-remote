@@ -56,14 +56,14 @@ Highest-value phase: everything here is testable with no Firebase account.
 
 ## Phase 3 — Firebase project and service skeleton
 
-- [ ] 3.1 Create the personal Firebase project; enable Realtime Database,
+- [x] 3.1 Create the personal Firebase project; enable Realtime Database,
       Authentication with Google, and Cloud Messaging. (Manual, user-performed.)
-- [ ] 3.2 `firebase/database.rules.json` per the spec; deploy it.
-- [ ] 3.3 `bridge/src/service/auth.mjs` — loopback-redirect OAuth sign-in, token
+- [x] 3.2 `firebase/database.rules.json` per the spec; deploy it.
+- [x] 3.3 `bridge/src/service/auth.mjs` — loopback-redirect OAuth sign-in, token
       exchange to Firebase, refresh token stored via `security add-generic-password`
       in the macOS Keychain. Never written to a file.
-- [ ] 3.4 `bridge/src/service/db.mjs` — authenticated Realtime Database writes.
-- [ ] 3.5 `bridge/src/service/index.mjs` — drain spool, summarise, scrub,
+- [x] 3.4 `bridge/src/service/db.mjs` — authenticated Realtime Database writes.
+- [x] 3.5 `bridge/src/service/index.mjs` — drain spool, summarise, scrub,
       encrypt, publish; delete the node on session end.
 - [ ] Validation: start a session, see the encrypted node appear in the console,
       confirm it is unreadable there.

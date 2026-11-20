@@ -1,0 +1,34 @@
+{
+  "rules": {
+    "u": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+
+        "sessions": {
+          "$sessionId": {
+            ".validate": "newData.hasChildren(['v', 'updatedAt', 'blob']) && newData.child('blob').isString() && newData.child('blob').val().length < 4096"
+          }
+        },
+        "replies": {
+          "$pushId": {
+            ".validate": "newData.hasChildren(['v', 'createdAt', 'blob']) && newData.child('blob').isString() && newData.child('blob').val().length < 4096"
+          }
+        },
+        "approvals": {
+          "$requestId": {
+            ".validate": "newData.hasChildren(['v', 'createdAt', 'blob']) && newData.child('blob').isString() && newData.child('blob').val().length < 4096"
+          }
+        },
+        "devices": {
+          "$installId": {
+            ".validate": "newData.hasChildren(['fcmToken', 'updatedAt'])"
+          }
+        },
+
+        "$other": { ".validate": false }
+      }
+    },
+    "$other": { ".read": false, ".write": false }
+  }
+}
