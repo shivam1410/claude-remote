@@ -229,11 +229,18 @@ export async function deliverReplies(config, key, deps = {}) {
       // it cannot be stopped, resuming would fork. Hold instead.
       if (!(await stop(payload.sessionId))) {
         console.log(`reply ${pushId}: cannot stop ${payload.sessionId}, holding rather than forking`);
+        // Say so on the phone. This is not a wait — an interactive session
+        // cannot be stopped, so the reply will never be delivered and
+        // "queued" on its own reads as a promise that will not be kept.
+        await noteHold(config, key, node, pushId, putReplyError,
+          'This session is open on the desktop. Claude Code cannot deliver into a live session; reply there, or send to a background session.');
         continue;
       }
       const after = await status(payload.sessionId);
       if (after !== 'gone') {
         console.log(`reply ${pushId}: still ${after ?? 'unknown'} after stop, holding`);
+        await noteHold(config, key, node, pushId, putReplyError,
+          'The session did not stop, so delivering would fork it. Still waiting.');
         continue;
       }
 
@@ -261,6 +268,26 @@ export async function deliverReplies(config, key, deps = {}) {
     await deleteReply(config, pushId);
   }
   return delivered;
+}
+
+/**
+ * Record why a reply is stuck, once.
+ *
+ * Written only when the node has no reason yet: the tick runs every two
+ * seconds, and re-writing the same sentence thirty times a minute would be a
+ * write amplification bug of its own.
+ */
+async function noteHold(config, key, node, pushId, putReplyError, message) {
+  if (typeof node?.errorBlob === 'string') return;
+  try {
+    await putReplyError(config, pushId, seal(key, {
+      v: PAYLOAD_VERSION,
+      message,
+      ts: Date.now(),
+    }));
+  } catch {
+    // The reply stays queued either way; this is only the explanation.
+  }
 }
 
 /** Build the encrypted node for one pending tool approval. */

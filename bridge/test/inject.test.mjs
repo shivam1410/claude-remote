@@ -323,3 +323,32 @@ test('a session still alive after the stop is never resumed', async () => {
   assert.deepEqual(h.ran, []);
   assert.deepEqual(h.deleted, []);
 });
+
+test('a reply that can never be delivered says why, once', async () => {
+  // `claude stop` cannot stop an interactive session, so this reply will
+  // never go. Thirty retries a minute with "queued" on screen reads as a
+  // promise that will not be kept — and re-writing the reason every tick
+  // would be its own bug.
+  sessionStates.clear();
+  sessionStates.set('sess-1', 'waiting_input');
+  const node1 = node(fresh({ sessionId: 'sess-1' }));
+  const pending = { r1: node1 };
+  const notes = [];
+  const h = harness(pending);
+
+  const deps = {
+    ...h.deps,
+    stop: async () => false,
+    status: async () => 'idle',
+    putReplyError: async (_c, pushId, blob) => {
+      notes.push(pushId);
+      node1.errorBlob = blob;
+    },
+  };
+
+  await deliverReplies({}, key, deps);
+  await deliverReplies({}, key, deps);
+
+  assert.deepEqual(notes, ['r1']);
+  assert.deepEqual(h.deleted, []);
+});
