@@ -351,7 +351,7 @@ private fun SessionCard(session: SessionPayload, onClick: () -> Unit) {
             if (session.summary.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    session.summary,
+                    inlineMarkdown(session.summary),
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
@@ -397,7 +397,10 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit, onReply: (S
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
-            Text(session.summary.ifEmpty { "Nothing said yet." }, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                inlineMarkdown(session.summary.ifEmpty { "Nothing said yet." }),
+                style = MaterialTheme.typography.bodyLarge,
+            )
         }
     }
 }

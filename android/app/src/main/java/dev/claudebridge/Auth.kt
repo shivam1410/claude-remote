@@ -39,13 +39,25 @@ object Auth {
      * fallback. Null is still normal — some accounts have no photo at all.
      */
     fun photoUrl(context: Context): String? {
-        val fromFirebase = runCatching {
-            FirebaseAuth.getInstance().currentUser?.photoUrl?.toString()
+        val found = runCatching {
+            val user = FirebaseAuth.getInstance().currentUser
+            // The top-level photoUrl is only set when the ID token carried a
+            // picture claim. The Google provider entry almost always has one
+            // regardless, and reading it needs no fresh sign-in.
+            user?.photoUrl?.toString()?.takeIf { it.isNotEmpty() }
+                ?: user?.providerData
+                    ?.firstOrNull { it.providerId == GoogleAuthProvider.PROVIDER_ID }
+                    ?.photoUrl?.toString()?.takeIf { it.isNotEmpty() }
         }.getOrNull()
-        if (!fromFirebase.isNullOrEmpty()) return fromFirebase
-        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_PHOTO, null)
-            ?.takeIf { it.isNotEmpty() }
+
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (found != null) {
+            // Cache it so the avatar survives a cold start before Firebase has
+            // restored the user.
+            prefs.edit { putString(KEY_PHOTO, found) }
+            return found
+        }
+        return prefs.getString(KEY_PHOTO, null)?.takeIf { it.isNotEmpty() }
     }
 
     /**

@@ -249,3 +249,41 @@ class LegacyPayloadTest {
         assertEquals("sess-2", BridgeJson.decodeFromString<SessionPayload>(json).sessionId)
     }
 }
+
+/**
+ * Claude's prose arrives with markdown in it, and the phone was showing the
+ * asterisks rather than the emphasis.
+ */
+class MarkdownTest {
+    private fun render(s: String) = inlineMarkdown(s).text
+
+    @Test
+    fun `markers are consumed and the words survive`() {
+        assertEquals("bold here", render("**bold** here"))
+        assertEquals("italic here", render("*italic* here"))
+        assertEquals("code here", render("`code` here"))
+        assertEquals("bold and italic", render("**bold** and *italic*"))
+    }
+
+    @Test
+    fun `bold wins over italic so two stars are not read as two italics`() {
+        val styled = inlineMarkdown("**x**")
+        assertEquals("x", styled.text)
+        assertEquals(1, styled.spanStyles.size)
+    }
+
+    @Test
+    fun `an unmatched marker is left visible rather than swallowed`() {
+        // A lone asterisk in prose is far more common than a broken span, and
+        // eating the rest of the sentence would be the worse failure.
+        assertEquals("2 * 3 = 6", render("2 * 3 = 6"))
+        assertEquals("**unclosed bold", render("**unclosed bold"))
+        assertEquals("**", render("**"))
+    }
+
+    @Test
+    fun `plain text and empty input are unchanged`() {
+        assertEquals("nothing to do here", render("nothing to do here"))
+        assertEquals("", render(""))
+    }
+}
