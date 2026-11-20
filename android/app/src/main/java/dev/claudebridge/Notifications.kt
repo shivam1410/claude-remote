@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.app.PendingIntent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -43,14 +44,27 @@ object Notifications {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(session.summary.ifEmpty { session.state })
             .setStyle(NotificationCompat.BigTextStyle().bigText(session.summary))
             .setAutoCancel(true)
             .setContentIntent(tap)
-            .build()
+
+        // "Open in Claude" only when the session is on Remote Control: that is
+        // the one way to reply into a live session, which this app cannot.
+        session.openUrl?.let { url ->
+            val open = PendingIntent.getActivity(
+                context,
+                url.hashCode(),
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            builder.addAction(0, "Open in Claude", open)
+        }
+
+        val notification = builder.build()
 
         try {
             // One notification per session: a later update replaces the earlier

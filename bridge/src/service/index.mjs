@@ -24,6 +24,7 @@ import * as db from './db.mjs';
 import * as fcm from './fcm.mjs';
 import * as keychain from './keychain.mjs';
 import { decode, classify, deliver, liveStatus, halt } from './inject.mjs';
+import { deepLinkFor } from './bridgeLink.mjs';
 import { DEFAULT_TIMEOUT_MS } from '../core/approval.mjs';
 
 const CURSOR_PATH = join(CONFIG_DIR, 'cursor.json');
@@ -86,6 +87,10 @@ function payloadFor(session) {
     summary: summarise(raw),
     tool: scrub(session.tool ?? ''),
     ts: session.ts,
+    // Present only for a Remote-Control-connected session: lets the phone
+    // open it in the official Claude app. Not scrubbed — it is a claude.ai
+    // session id, not work content — but still sealed with everything else.
+    ...(deepLinkFor(session.sessionId) && { openUrl: deepLinkFor(session.sessionId) }),
   };
 }
 

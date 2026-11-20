@@ -1,5 +1,7 @@
 package dev.claudebridge
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.Button
@@ -52,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
@@ -443,6 +447,26 @@ fun SessionDetailScreen(
         ) {
             Text(stateLabel(session.state), style = MaterialTheme.typography.labelLarge)
             if (session.branch.isNotEmpty()) Text(session.branch, style = MaterialTheme.typography.labelMedium)
+
+            // Only when the session is on Remote Control: the official Claude
+            // app can reply into a live session, which this bridge cannot.
+            session.openUrl?.let { url ->
+                val context = LocalContext.current
+                OutlinedButton(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        }
+                    },
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Open in Claude")
+                }
+            }
             if (session.ts > 0) {
                 Text(
                     DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(session.ts)),
