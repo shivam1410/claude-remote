@@ -33,11 +33,12 @@
         </activity>
 
         <!-- zxing declares this activity as sensorLandscape in its own
-             manifest, which no ScanOptions flag can override. Scanning a QR
-             held in either hand should follow the phone, not force a turn. -->
+             manifest, which no ScanOptions flag can override. fullUser, not
+             fullSensor: all four orientations are allowed, but a phone with
+             auto-rotate switched off stays where the user put it. -->
         <activity
             android:name="com.journeyapps.barcodescanner.CaptureActivity"
-            android:screenOrientation="fullSensor"
+            android:screenOrientation="fullUser"
             android:stateNotNeeded="true"
             android:theme="@style/zxing_CaptureTheme"
             tools:replace="android:screenOrientation" />
