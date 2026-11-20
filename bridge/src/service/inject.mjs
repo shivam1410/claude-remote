@@ -67,7 +67,11 @@ export function classify(payload, sessions) {
   if (!payload) return { action: 'discard', reason: 'undecodable' };
 
   const state = sessions?.get?.(payload.sessionId);
-  if (state === undefined) return { action: 'discard', reason: 'unknown-session' };
+  // Not "unknown" so much as "not seen yet": the service tracks state in
+  // memory, so every restart starts blank. Discarding here threw away a reply
+  // the user had already sent. Hold it instead — decode already refuses
+  // anything older than a day, so nothing accumulates forever.
+  if (state === undefined) return { action: 'queue', reason: 'unknown-session' };
   if (!IDLE_STATES.has(state)) return { action: 'queue', reason: `busy:${state}` };
 
   return { action: 'deliver', reason: 'idle' };
@@ -83,7 +87,7 @@ export function deliver(payload, { bin = resolveBin(), cwd } = {}) {
   return new Promise((resolve, reject) => {
     execFile(
       bin,
-      ['--bg', '--resume', payload.sessionId, '-p', payload.text],
+      ['--bg', '--resume', payload.sessionId, payload.text],
       { cwd, timeout: SPAWN_TIMEOUT_MS, windowsHide: true },
       (error, stdout, stderr) => {
         if (error) {

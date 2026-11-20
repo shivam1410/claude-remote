@@ -72,8 +72,11 @@ test('queues a reply aimed at a running session rather than forking it', () => {
   }
 });
 
-test('discards a reply for a session the bridge has never seen', () => {
-  assert.equal(classify(reply(), new Map()).action, 'discard');
+test('holds a reply for a session the bridge has not seen yet', () => {
+  // The service keeps session state in memory, so a restart makes every
+  // session look unknown. Discarding here lost a reply the user had already
+  // sent; it is held until that session reports in or the reply ages out.
+  assert.equal(classify(reply(), new Map()).action, 'queue');
 });
 
 test('discards an undecodable reply', () => {
@@ -160,11 +163,13 @@ test('an undecodable reply is deleted rather than retried forever', async () => 
   assert.deepEqual(h.deleted, ['junk']);
 });
 
-test('a reply for an unknown session is deleted', async () => {
+test('a reply for a session not seen yet survives the pass', async () => {
+  // Nothing is delivered and, crucially, nothing is deleted: the node is the
+  // queue, so it is still there on the next pass once the session reports in.
   sessionStates.clear();
   const pending = { orphan: node(fresh({ sessionId: 'gone' })) };
   const h = harness(pending);
 
   assert.equal(await deliverReplies({}, key, h.deps), 0);
-  assert.deepEqual(h.deleted, ['orphan']);
+  assert.deepEqual(h.deleted, []);
 });

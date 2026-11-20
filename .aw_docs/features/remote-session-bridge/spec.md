@@ -142,7 +142,7 @@ Phone encrypts and writes to `/u/{uid}/replies`. The service decrypts, checks
 the target session is known and idle, then runs:
 
 ```
-claude --bg --resume <sessionId> -p "<text>"
+claude --bg --resume <sessionId> "<text>"
 ```
 
 If the session is busy the reply is held and delivered on the next idle event.
@@ -185,9 +185,17 @@ summary, the tool name, and the project label.
   path; approvals and the app polish can follow.
 - **R3 — Heuristic summaries read mechanically** on messages that open with a
   question or a list. Acceptable, and revisitable without touching the protocol.
-- **R4 — `claude --bg --resume` behaviour is the pivot of the reply path.** It is
-  verified from the CLI help for 2.1.316 but not yet exercised end to end. Phase 5
-  proves it against a scratch session before anything is built on top.
+- **R4 — RESOLVED, and the original form was wrong.** `claude --bg --resume <id>`
+  does continue the session under the same id, but the prompt must be the
+  positional argument. Passing it with `-p` makes the CLI refuse outright:
+  "--bg and --print conflict: --print never starts the interactive session that
+  `claude agents` attaches to". The 5.1 spike failed on an expired OAuth session
+  before it reached this, so the error stood undetected from Phase 5 until the
+  first real reply was sent from the phone. Correct form:
+
+```
+claude --bg --resume <sessionId> "<text>"
+```
 
 ## Verification
 
