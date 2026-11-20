@@ -83,41 +83,63 @@ Prove R4 before building on it.
 - [x] 5.1 Spike: manually run `claude --bg --resume <id> -p "hi"` against a
       scratch session and confirm it continues rather than forking. If it
       forks, stop and re-plan this phase.
-- [ ] 5.2 `bridge/src/service/inject.mjs` — decrypt, validate the target, run the
+- [x] 5.2 `bridge/src/service/inject.mjs` — decrypt, validate the target, run the
       resume command.
-- [ ] 5.3 Idle-state tracking plus the busy-session queue, flushed on the next
+- [x] 5.3 Idle-state tracking plus the busy-session queue, flushed on the next
       idle event.
-- [ ] 5.4 Test: a reply arriving while busy is held, then delivered exactly once.
-- [ ] 5.5 Delete the reply node after delivery.
+- [x] 5.4 Test: a reply arriving while busy is held, then delivered exactly once.
+- [x] 5.5 Delete the reply node after delivery.
 - [ ] Commit: `feat: queued reply injection`
 
 ## Phase 6 — Remote approval
 
-- [ ] 6.1 Extend the hook emitter to handle `PreToolUse` for flagged tools in
+- [x] 6.1 Extend the hook emitter to handle `PreToolUse` for flagged tools in
       enrolled sessions; poll a local decision file with a bounded timeout.
-- [ ] 6.2 Emit `hookSpecificOutput.permissionDecision`; emit `ask` on timeout.
-- [ ] 6.3 Service relays the request and writes the decision back.
-- [ ] 6.4 Test: timeout path returns `ask` and never blocks indefinitely.
+- [x] 6.2 Emit `hookSpecificOutput.permissionDecision`; emit `ask` on timeout.
+- [x] 6.3 Service relays the request and writes the decision back.
+- [x] 6.4 Test: timeout path returns `ask` and never blocks indefinitely.
 - [ ] Commit: `feat: remote tool approval with ask fallback`
 
 ## Phase 7 — Push
 
-- [ ] 7.1 Decide R1: enable Blaze for Cloud Functions, or fall back to an
+- [x] 7.1 Decide R1: enable Blaze for Cloud Functions, or fall back to an
       Android foreground service. Blocks 7.2.
-- [ ] 7.2 `functions/index.js` — database trigger, FCM data-only fan-out.
-- [ ] 7.3 Device token registration path.
+- [x] 7.2 `functions/index.js` — database trigger, FCM data-only fan-out.
+- [x] 7.3 Device token registration path.
 - [ ] Commit: `feat: push fan-out on actionable state changes`
 
 ## Phase 8 — Android app
 
-- [ ] 8.1 Compose project, Google sign-in with the pinned account.
-- [ ] 8.2 QR scan, key import into the Android Keystore.
-- [ ] 8.3 Session list bound to the database, decrypting locally.
-- [ ] 8.4 Detail view: summary, state, reply box.
-- [ ] 8.5 Approve and deny actions.
-- [ ] 8.6 FCM receiver: decrypt, then build the notification locally.
-- [ ] 8.7 `adb install` and verify on the handset.
+- [x] 8.1 Compose project, Google sign-in with the pinned account.
+- [x] 8.2 QR scan, key import into the Android Keystore.
+- [x] 8.3 Session list bound to the database, decrypting locally.
+- [x] 8.4 Detail view: summary, state, reply box.
+- [x] 8.5 Approve and deny actions.
+- [x] 8.6 FCM receiver: decrypt, then build the notification locally.
+- [ ] 8.7 `adb install` and verify on the handset. Blocked until the Android
+      app is registered in Firebase and `google-services.json` lands in
+      `android/app/` — the build works without it, but `FirebaseApp` does not
+      initialise at runtime and the app stops at the setup screen.
+- [ ] 8.8 Update check: poll the GitHub Releases API for the latest tag and
+      compare against `BuildConfig.VERSION_NAME`.
+- [ ] 8.9 Download the release APK, verify its signing certificate matches the
+      installed app's before handing it to the package installer. Fail with a
+      clear message on mismatch rather than letting the install error.
+- [ ] 8.10 `REQUEST_INSTALL_PACKAGES` permission plus the install-unknown-apps
+      consent flow.
 - [ ] Commit: `feat: android client`
+
+### Distribution — decided
+
+GitHub Releases. The APK carries no secret: `google-services.json` values
+(`apiKey`, `projectId`, `databaseUrl`, `appId`) and the Android OAuth client id
+are public by Firebase design, and the 32-byte shared key never enters the
+build — it arrives by QR at pairing and lives in the Android Keystore.
+
+The release signing keystore stays on the Mac. Build and upload release assets
+by hand; do not put the keystore in GitHub Actions secrets (`nhi7`:
+long-lived static credential). Android enforces same-signer for
+update-over-install, so the same key must sign every release.
 
 ## Phase 9 — Operationalise
 
