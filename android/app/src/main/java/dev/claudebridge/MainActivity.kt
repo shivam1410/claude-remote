@@ -161,6 +161,7 @@ fun BridgeApp(initialSessionId: String?) {
 
     val sessions by repo.sessions.collectAsStateWithLifecycle(emptyList())
     val approvals by repo.approvals.collectAsStateWithLifecycle(emptyList())
+    val queuedReplies by repo.pendingReplies.collectAsStateWithLifecycle(emptyList())
 
     val open = sessions.firstOrNull { it.sessionId == selected }
 
@@ -172,6 +173,7 @@ fun BridgeApp(initialSessionId: String?) {
     if (open != null) {
         SessionDetailScreen(
             session = open,
+            queued = queuedReplies.filter { it.sessionId == open.sessionId },
             onBack = { selected = null },
             onReply = { text -> scope.launch { runCatching { repo.reply(open.sessionId, text) } } },
         )

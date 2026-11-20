@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 // Pure mapping from spooled hook events to the one-line session view the phone
 // sees. No I/O, so it is fully testable offline.
@@ -30,7 +30,7 @@ export function stateForEvent(record) {
 }
 
 /** The short project label shown on the phone: the working directory's name. */
-export function projectLabel(cwd, isRepoRoot = defaultIsRepoRoot) {
+export function projectLabel(cwd, repoRootOf = defaultRepoRootOf) {
   if (typeof cwd !== 'string' || cwd === '') return 'unknown';
   const parts = cwd.replace(/\/+$/, '').split('/').filter(Boolean);
   if (parts.length === 0) return 'unknown';
@@ -40,17 +40,36 @@ export function projectLabel(cwd, isRepoRoot = defaultIsRepoRoot) {
   // the project it belongs to, which is useless on a phone showing several
   // sessions at once.
   for (let i = parts.length; i > 0; i -= 1) {
-    if (isRepoRoot(`/${parts.slice(0, i).join('/')}`)) return parts[i - 1];
+    const root = repoRootOf(`/${parts.slice(0, i).join('/')}`);
+    if (root) return root.replace(/\/+$/, '').split('/').filter(Boolean).pop() ?? 'unknown';
   }
   return parts[parts.length - 1];
 }
 
-function defaultIsRepoRoot(dir) {
+/**
+ * The main repository directory for `dir`, or null if it is not a repo root.
+ *
+ * Claude Code gives each session its own git worktree, whose folder is named
+ * after the session. A worktree's `.git` is a file pointing at the real
+ * repository, so stopping at the first `.git` labelled every session with its
+ * own worktree name — and grouping by that puts every session in a group of
+ * one. Following the pointer gives the repository they all belong to.
+ */
+export function defaultRepoRootOf(dir) {
   try {
-    return existsSync(join(dir, '.git'));
+    const dotGit = join(dir, '.git');
+    const stat = statSync(dotGit);
+    if (stat.isDirectory()) return dir;
+    if (!stat.isFile()) return null;
+
+    const match = readFileSync(dotGit, 'utf8').match(/gitdir:\s*(.+)/);
+    if (!match) return dir;
+    const gitdir = match[1].trim();
+    const marker = gitdir.indexOf('/.git/worktrees/');
+    return marker > 0 ? gitdir.slice(0, marker) : dir;
   } catch {
-    // Unreadable path: fall back to the leaf name rather than failing.
-    return false;
+    // Missing or unreadable: not a repo root, keep walking up.
+    return null;
   }
 }
 

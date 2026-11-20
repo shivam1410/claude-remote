@@ -47,6 +47,16 @@ class Repo(private val uid: String, private val key: SecretKey, databaseUrl: Str
         else decode<ApprovalPayload>(snapshot.child("blob").getValue(String::class.java))
     }
 
+    /**
+     * Replies this phone has sent that the Mac has not delivered yet.
+     *
+     * Without this a sent message vanished: it was written to the database and
+     * held until the session went idle, but nothing on screen said so.
+     */
+    val pendingReplies: Flow<List<ReplyPayload>> = stream("replies") { snapshot ->
+        decode<ReplyPayload>(snapshot.child("blob").getValue(String::class.java))
+    }
+
     /** Queue a reply. The Mac delivers it when that session is next idle. */
     suspend fun reply(sessionId: String, text: String) {
         val payload = ReplyPayload(sessionId = sessionId, text = text, ts = System.currentTimeMillis())

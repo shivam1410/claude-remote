@@ -9,7 +9,7 @@
 //
 // This process is the only thing that touches the network. If it is not
 // running, sessions are unaffected and the spool simply grows until it starts.
-import { readFileSync } from 'node:fs';
+import { statSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync, utimesSync, closeSync, openSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -38,7 +38,17 @@ const PAYLOAD_VERSION = 1;
 function branchOf(cwd) {
   if (!cwd) return null;
   try {
-    const head = readFileSync(join(cwd, '.git', 'HEAD'), 'utf8');
+    // In a worktree .git is a file pointing at the real git directory, so
+    // joining ".git/HEAD" as a path fails and every worktree session reported
+    // no branch at all. Follow the pointer first.
+    const dotGit = join(cwd, '.git');
+    let gitDir = dotGit;
+    if (statSync(dotGit).isFile()) {
+      const match = readFileSync(dotGit, 'utf8').match(/gitdir:\s*(.+)/);
+      if (!match) return null;
+      gitDir = match[1].trim();
+    }
+    const head = readFileSync(join(gitDir, 'HEAD'), 'utf8');
     const match = head.match(/^ref: refs\/heads\/(.+)$/m);
     return match ? match[1].trim() : null;
   } catch {
@@ -80,6 +90,11 @@ function nodeFor(key, session) {
 // idle session from a running one; a session is dropped the moment it ends.
 export const sessionStates = new Map();
 
+// Where each live session is working. A resume must run in the session's own
+// directory: the trust prompt is per-directory, so spawning in the service's
+// cwd asks the user to trust a folder that has nothing to do with the session.
+export const sessionCwds = new Map();
+
 /** Drain the spool and publish. Returns the number of sessions touched. */
 export async function publish(config, key) {
   const cursor = readCursor(CURSOR_PATH);
@@ -109,9 +124,11 @@ export async function publish(config, key) {
     if (session.ended) {
       await db.deleteSession(config, session.sessionId);
       sessionStates.delete(session.sessionId);
+      sessionCwds.delete(session.sessionId);
     } else {
       await db.putSession(config, session.sessionId, nodeFor(key, session));
       sessionStates.set(session.sessionId, session.state);
+      if (session.cwd) sessionCwds.set(session.sessionId, session.cwd);
     }
   }
 
@@ -140,7 +157,7 @@ export async function deliverReplies(config, key, deps = {}) {
 
     if (action === 'queue') continue;
     if (action === 'deliver') {
-      await run(payload);
+      await run(payload, { cwd: sessionCwds.get(payload.sessionId) });
       delivered += 1;
       // The session is no longer idle; hold the rest of this batch for it.
       sessionStates.set(payload.sessionId, 'running');

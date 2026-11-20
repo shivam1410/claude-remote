@@ -97,13 +97,26 @@ test('projectLabel names the repository, not the subdirectory you happen to be i
   // A session working in a subdirectory was labelled by that subdirectory —
   // "android" instead of the project — which is useless on a phone listing
   // several sessions at once.
-  const isRepoRoot = (dir) => dir === '/Users/me/code/my-project';
-  assert.equal(projectLabel('/Users/me/code/my-project/android/app', isRepoRoot), 'my-project');
-  assert.equal(projectLabel('/Users/me/code/my-project', isRepoRoot), 'my-project');
+  const roots = (dir) => (dir === '/Users/me/code/my-project' ? dir : null);
+  assert.equal(projectLabel('/Users/me/code/my-project/android/app', roots), 'my-project');
+  assert.equal(projectLabel('/Users/me/code/my-project', roots), 'my-project');
+});
+
+test('projectLabel resolves a worktree to the repository it belongs to', () => {
+  // Claude Code gives each session its own worktree, named after the session.
+  // Labelling by the worktree put every session in a group of one.
+  const roots = (dir) =>
+    dir === '/Users/me/worktrees/archived-chat-access-b53a8d'
+      ? '/Users/me/code/ai-backend'
+      : null;
+  assert.equal(
+    projectLabel('/Users/me/worktrees/archived-chat-access-b53a8d/src', roots),
+    'ai-backend',
+  );
 });
 
 test('projectLabel falls back to the leaf outside a repository', () => {
-  const never = () => false;
+  const never = () => null;
   assert.equal(projectLabel('/tmp/scratch/deep', never), 'deep');
   assert.equal(projectLabel('', never), 'unknown');
   assert.equal(projectLabel(undefined, never), 'unknown');

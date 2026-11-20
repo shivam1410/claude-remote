@@ -1,5 +1,6 @@
 package dev.claudebridge
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.FilledIconButton
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -47,7 +49,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
@@ -263,9 +267,21 @@ fun SessionListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                // The count is diagnostic as much as cosmetic: it separates
-                // "nothing arrived" from "it arrived and the list dropped it".
-                title = { Text(if (sessions.isEmpty()) "Sessions" else "Sessions (${sessions.size})") },
+                title = {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text("Sessions")
+                        if (sessions.isNotEmpty()) {
+                            // Smaller and dimmer: it is a count, not part of
+                            // the title.
+                            Text(
+                                " ${sessions.size}",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 3.dp),
+                            )
+                        }
+                    }
+                },
                 actions = {
                     AccountMenu(
                         email = accountEmail,
@@ -279,6 +295,15 @@ fun SessionListScreen(
             )
         },
     ) { padding ->
+        val grouped = remember(sessions) {
+            sessions
+                .groupBy { it.project.ifEmpty { "unknown" } }
+                // Newest first inside a project, projects alphabetical, so the
+                // list does not reshuffle every time a session ticks.
+                .mapValues { (_, group) -> group.sortedByDescending { it.ts } }
+                .toSortedMap()
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
@@ -289,8 +314,20 @@ fun SessionListScreen(
                 ApprovalCard(approval, onDecide)
             }
 
-            items(sessions, key = { it.sessionId }) { session ->
-                SessionCard(session) { onOpen(session) }
+            // Grouped by project. Thirteen flat rows across eight repos is a
+            // wall; the repo name is the thing you scan for first.
+            for ((project, group) in grouped) {
+                item(key = "header-$project") {
+                    Text(
+                        project,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+                    )
+                }
+                items(group, key = { it.sessionId }) { session ->
+                    SessionCard(session) { onOpen(session) }
+                }
             }
 
             if (sessions.isEmpty() && approvals.isEmpty()) {
@@ -342,11 +379,24 @@ private fun SessionCard(session: SessionPayload, onClick: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
+                // The project is the group header above. The branch is the
+                // useful identifier here: Claude Code names a session's
+                // worktree branch after the work, so it reads like a title.
                 Text(
-                    session.project.ifEmpty { "session" },
-                    style = MaterialTheme.typography.titleMedium,
+                    session.branch.ifEmpty {
+                        if (session.ts > 0) {
+                            DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(session.ts))
+                        } else {
+                            "session"
+                        }
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
-                Text(stateLabel(session.state), style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(8.dp))
+                StateTag(session.state)
             }
             if (session.summary.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))
@@ -363,7 +413,12 @@ private fun SessionCard(session: SessionPayload, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit, onReply: (String) -> Unit) {
+fun SessionDetailScreen(
+    session: SessionPayload,
+    queued: List<ReplyPayload>,
+    onBack: () -> Unit,
+    onReply: (String) -> Unit,
+) {
     var text by remember { mutableStateOf("") }
 
     Scaffold(
@@ -401,6 +456,36 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit, onReply: (S
                 inlineMarkdown(session.summary.ifEmpty { "Nothing said yet." }),
                 style = MaterialTheme.typography.bodyLarge,
             )
+
+            // Without this a sent message simply vanished: it was written to
+            // the database and held until the session went idle, and nothing
+            // on screen said so.
+            if (queued.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Waiting to send",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                for (reply in queued.sortedBy { it.ts }) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(reply.text, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                if (session.needsAttention) "Delivering…"
+                                else "Held until this session asks for input",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -460,6 +545,42 @@ private fun ReplyBar(session: SessionPayload, onReply: (String) -> Unit) {
 }
 
 private val REPLY_BAR_HEIGHT = 56.dp
+
+/**
+ * The state, as a coloured pill.
+ *
+ * Colour carries the urgency so the list can be read at a glance: anything
+ * wanting you is tinted, anything merely working is not.
+ */
+@Composable
+private fun StateTag(state: String) {
+    // Explicit hues rather than the scheme's containers: tertiaryContainer is
+    // pink in this scheme, so "Finished" read as a failure next to "Error".
+    // Each state needs its own hue, and five of them is more than the scheme
+    // has semantic slots for.
+    val dark = isSystemInDarkTheme()
+    val hue = when (state) {
+        "waiting_input" -> if (dark) Color(0xFFB69DF8) else Color(0xFF5B3BB5)
+        "waiting_approval" -> if (dark) Color(0xFFFFB77C) else Color(0xFFB34700)
+        "error" -> if (dark) Color(0xFFFF8A80) else Color(0xFFB3261E)
+        "done" -> if (dark) Color(0xFF8BD79B) else Color(0xFF1F6B33)
+        // Running is the quiet state: nothing is being asked of you, so it
+        // stays uncoloured and recedes.
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val background = hue.copy(alpha = if (dark) 0.22f else 0.14f)
+    val foreground = hue
+
+    Text(
+        stateLabel(state),
+        style = MaterialTheme.typography.labelSmall,
+        color = foreground,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(background)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    )
+}
 
 private fun stateLabel(state: String): String = when (state) {
     "waiting_input" -> "Needs input"
