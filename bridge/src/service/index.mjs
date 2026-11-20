@@ -35,8 +35,11 @@ const POLL_MS = 2000;
 const PAYLOAD_VERSION = 1;
 
 /** Read the checked-out branch without shelling out to git. */
-function branchOf(cwd) {
-  if (!cwd) return null;
+function branchOf(rawCwd) {
+  if (!rawCwd) return null;
+  // The workspace, not the momentary cwd: a session working in a
+  // subdirectory has no .git there, and reported no branch at all.
+  const cwd = workspaceRoot(rawCwd) ?? rawCwd;
   try {
     // In a worktree .git is a file pointing at the real git directory, so
     // joining ".git/HEAD" as a path fails and every worktree session reported
