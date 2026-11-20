@@ -472,9 +472,12 @@ fun SessionDetailScreen(
                     ) {
                         Column(Modifier.padding(12.dp)) {
                             Text(reply.text, style = MaterialTheme.typography.bodyMedium)
+                            // Never claim progress that is not happening.
+                            // "Delivering…" read as a confirmation when the
+                            // Mac was in fact failing on every attempt.
                             Text(
-                                if (session.needsAttention) "Delivering…"
-                                else "Held until this session asks for input",
+                                if (session.needsAttention) "Queued — the Mac will pick this up"
+                                else "Queued — held until this session asks for input",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
