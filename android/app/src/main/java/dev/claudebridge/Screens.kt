@@ -2,6 +2,14 @@ package dev.claudebridge
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,8 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -367,9 +375,16 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit, onReply: (S
                 },
             )
         },
+        bottomBar = { ReplyBar(session, onReply) },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp)
+                // The summary can run long and the keyboard eats half the
+                // screen, so the body scrolls and the reply row does not.
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(stateLabel(session.state), style = MaterialTheme.typography.labelLarge)
@@ -381,36 +396,65 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit, onReply: (S
                 )
             }
             Text(session.summary.ifEmpty { "Nothing said yet." }, style = MaterialTheme.typography.bodyLarge)
+        }
+    }
+}
 
-            Spacer(Modifier.height(8.dp))
+/** Text field and send button, same height, side by side. */
+@Composable
+private fun ReplyBar(session: SessionPayload, onReply: (String) -> Unit) {
+    var text by remember(session.sessionId) { mutableStateOf("") }
+    val canSend = text.isNotBlank()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            // Sits above the keyboard and clear of the gesture bar.
+            .imePadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        if (!session.needsAttention) {
+            // The Mac holds a reply until the session is idle, because
+            // resuming a running one forks the conversation.
+            Text(
+                "Busy — a reply is held until it next asks for input.",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
+        }
+
+        Row(
+            // A fixed height on the row is what makes the button match the
+            // field exactly; IntrinsicSize would leave it to the text field's
+            // own minimum and drift with the font scale.
+            modifier = Modifier.fillMaxWidth().height(REPLY_BAR_HEIGHT),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                label = { Text("Reply") },
-                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Reply") },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
             )
-            if (!session.needsAttention) {
-                // The Mac holds a reply until the session is idle, because
-                // resuming a running one forks the conversation.
-                Text(
-                    "This session is busy. A reply is held until it next asks for input.",
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            }
-            Button(
+            FilledIconButton(
                 onClick = {
                     onReply(text.trim())
                     text = ""
                 },
-                enabled = text.isNotBlank(),
+                enabled = canSend,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxHeight().aspectRatio(1f),
             ) {
-                Icon(Icons.Filled.Send, contentDescription = null)
-                Spacer(Modifier.height(0.dp))
-                Text("  Send")
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
             }
         }
     }
 }
+
+private val REPLY_BAR_HEIGHT = 56.dp
 
 private fun stateLabel(state: String): String = when (state) {
     "waiting_input" -> "Needs input"
