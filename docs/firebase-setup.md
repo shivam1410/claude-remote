@@ -91,3 +91,14 @@ cd bridge && npm run doctor
 It stops at the first unfinished step and masks every secret, so the output is
 safe to paste. When it reaches the end it has written, read back, and deleted a
 probe node through the live rules — that is the proof the whole chain works.
+
+### Choosing the browser
+
+Sign-in opens your default browser. To use another one:
+
+```bash
+CLAUDE_BRIDGE_BROWSER=Firefox npm run login
+```
+
+The value is whatever `open -a` accepts, for example `Firefox` or
+`"Google Chrome"`. The URL is also printed, so pasting it anywhere works too.

@@ -109,9 +109,19 @@ export async function login(config = load()) {
     prompt: 'consent',
   })}`;
 
-  console.log('Opening your browser to sign in…');
+  // CLAUDE_BRIDGE_BROWSER picks the app: an application name as `open -a`
+  // understands it, e.g. Firefox or "Google Chrome". Unset uses the default.
+  const browser = process.env.CLAUDE_BRIDGE_BROWSER;
+  const openArgs = browser ? ['-a', browser, authUrl] : [authUrl];
+
+  console.log(`Opening ${browser ?? 'your default browser'} to sign in…`);
   console.log(authUrl);
-  execFile('open', [authUrl], () => {});
+  execFile('open', openArgs, (error) => {
+    if (error) {
+      console.error(`could not open ${browser ?? 'a browser'}: ${error.message}`);
+      console.error('Paste the URL above into a browser instead.');
+    }
+  });
 
   const code = await codePromise;
 
