@@ -83,3 +83,21 @@ test('readRecords carries the title even without a bridge id', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('readRecords labels the launch origin from kind/entrypoint', () => {
+  const dir = fixtureDir({
+    '1.json': { sessionId: 'aaa', entrypoint: 'claude-desktop', kind: 'interactive' },
+    '2.json': { sessionId: 'bbb', entrypoint: 'cli', kind: 'interactive' },
+    '3.json': { sessionId: 'ccc', entrypoint: 'cli', kind: 'background' },
+    '4.json': { sessionId: 'ddd' }, // no origin signal and nothing else: skipped
+  });
+  try {
+    const map = readRecords(dir);
+    assert.equal(map.get('aaa').origin, 'desktop');
+    assert.equal(map.get('bbb').origin, 'cli');
+    assert.equal(map.get('ccc').origin, 'bg'); // background wins over entrypoint
+    assert.equal(map.has('ddd'), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

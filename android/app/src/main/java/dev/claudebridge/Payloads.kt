@@ -38,6 +38,9 @@ data class SessionPayload(
     val model: String = "",
     // When the session process started, epoch ms; 0 when unknown.
     val startedAt: Long = 0,
+    // Where it was launched: "bg", "desktop", or "cli". Empty when unknown.
+    // Only "desktop" sessions appear in the Claude desktop app.
+    val origin: String = "",
     // Present only when the session is connected to Remote Control. The URL to
     // open it in the official Claude app (or browser).
     val openUrl: String? = null,

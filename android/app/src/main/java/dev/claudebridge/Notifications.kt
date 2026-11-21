@@ -26,6 +26,10 @@ object Notifications {
             return
         }
 
+        // Muted on this phone: the session still updates in the list, it just
+        // does not raise a notification.
+        if (Mutes.isMuted(context, session.sessionId)) return
+
         val name = session.title.ifEmpty { session.project }
         val title = when (session.state) {
             "waiting_input" -> "$name needs you"

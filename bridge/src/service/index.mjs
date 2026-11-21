@@ -24,7 +24,7 @@ import * as db from './db.mjs';
 import * as fcm from './fcm.mjs';
 import * as keychain from './keychain.mjs';
 import { decode, classify, deliver, liveStatus, halt } from './inject.mjs';
-import { deepLinkFor, titleFor, startedAtFor, liveSessionIds } from './bridgeLink.mjs';
+import { deepLinkFor, titleFor, startedAtFor, originFor, liveSessionIds } from './bridgeLink.mjs';
 import { prFor } from './pr.mjs';
 import { decode as decodeCommand, runStart } from './commands.mjs';
 import { DEFAULT_TIMEOUT_MS } from '../core/approval.mjs';
@@ -108,6 +108,9 @@ function payloadFor(session) {
     model: modelOf(session.transcriptPath),
     // When the session process started, epoch ms, so the phone shows elapsed.
     startedAt: startedAtFor(session.sessionId) ?? 0,
+    // Where it was launched ("bg" | "desktop" | "cli"); a fixed enum, not work
+    // content, so it needs no scrub. Empty when unknown.
+    origin: originFor(session.sessionId) ?? '',
     // The full last message, markdown kept (tables, links, lists), secrets
     // still scrubbed — the org rule redacts before any sink, encrypted or not.
     // Capped so the sealed blob stays under the 4096 database-rule limit; a

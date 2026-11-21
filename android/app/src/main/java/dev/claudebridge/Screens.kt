@@ -35,6 +35,8 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -504,6 +506,7 @@ private fun ApprovalCard(approval: ApprovalPayload, onDecide: (ApprovalPayload, 
 
 @Composable
 private fun SessionCard(session: SessionPayload, onClick: () -> Unit) {
+    val context = LocalContext.current
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(Modifier.padding(16.dp)) {
             Row(
@@ -529,6 +532,17 @@ private fun SessionCard(session: SessionPayload, onClick: () -> Unit) {
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 Spacer(Modifier.width(8.dp))
+                // Read fresh on each (re)composition; the list rebuilds when you
+                // return from the detail screen, so a toggle there shows here.
+                if (Mutes.isMuted(context, session.sessionId)) {
+                    Icon(
+                        Icons.Filled.NotificationsOff,
+                        contentDescription = "Muted",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
                 StateTag(session.state)
             }
             if (session.ts > 0) {
@@ -568,6 +582,18 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit) {
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    val context = LocalContext.current
+                    var muted by remember(session.sessionId) {
+                        mutableStateOf(Mutes.isMuted(context, session.sessionId))
+                    }
+                    IconButton(onClick = { muted = Mutes.toggle(context, session.sessionId) }) {
+                        Icon(
+                            if (muted) Icons.Filled.NotificationsOff else Icons.Filled.Notifications,
+                            contentDescription = if (muted) "Unmute notifications" else "Mute notifications",
+                        )
                     }
                 },
             )
@@ -643,6 +669,11 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit) {
 private fun SessionChips(session: SessionPayload) {
     val context = LocalContext.current
     val chips = buildList {
+        when (session.origin) {
+            "bg" -> add("background")
+            "cli" -> add("terminal")
+            "desktop" -> add("desktop app")
+        }
         if (session.branch.isNotEmpty()) add("⎇ ${session.branch}")
         // "claude-opus-4-8" -> "opus-4-8": the vendor prefix is noise on a chip.
         if (session.model.isNotEmpty()) add(session.model.removePrefix("claude-"))

@@ -27,6 +27,20 @@ let cache = { at: 0, map: new Map() };
  * A record with no bridgeSessionId still contributes its name; both fields are
  * optional. Pure but for the directory read; the directory is injectable.
  */
+/**
+ * A short, non-sensitive label for where the session was launched, from the
+ * record's `kind`/`entrypoint`. "bg" for a headless (background) session,
+ * "desktop" for the Claude desktop app, "cli" for a terminal — the last two
+ * both run hooks and notify the phone, but only "desktop" appears in the app.
+ * Null when the record says nothing useful.
+ */
+function originLabel(record) {
+  if (record?.kind && record.kind !== 'interactive') return 'bg';
+  if (record?.entrypoint === 'claude-desktop') return 'desktop';
+  if (record?.entrypoint === 'cli') return 'cli';
+  return null;
+}
+
 export function readRecords(dir = SESSIONS_DIR) {
   const map = new Map();
   let names;
@@ -46,8 +60,9 @@ export function readRecords(dir = SESSIONS_DIR) {
       const title = typeof record.name === 'string' && record.name !== ''
         ? record.name : null;
       const startedAt = Number.isFinite(record.startedAt) ? record.startedAt : null;
-      if (bridgeSessionId || title || startedAt) {
-        map.set(record.sessionId, { bridgeSessionId, title, startedAt });
+      const origin = originLabel(record);
+      if (bridgeSessionId || title || startedAt || origin) {
+        map.set(record.sessionId, { bridgeSessionId, title, startedAt, origin });
       }
     } catch {
       // One bad file must not lose the rest.
@@ -97,6 +112,11 @@ export function titleFor(sessionId, now = Date.now()) {
 /** When the session process started, in epoch ms, or null. */
 export function startedAtFor(sessionId, now = Date.now()) {
   return recordFor(sessionId, now)?.startedAt ?? null;
+}
+
+/** Where the session was launched ("bg" | "desktop" | "cli"), or null. */
+export function originFor(sessionId, now = Date.now()) {
+  return recordFor(sessionId, now)?.origin ?? null;
 }
 
 /** True when a process with this pid exists (EPERM still means it is alive). */
