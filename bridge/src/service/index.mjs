@@ -24,7 +24,7 @@ import * as db from './db.mjs';
 import * as fcm from './fcm.mjs';
 import * as keychain from './keychain.mjs';
 import { decode, classify, deliver, liveStatus, halt } from './inject.mjs';
-import { deepLinkFor } from './bridgeLink.mjs';
+import { deepLinkFor, titleFor } from './bridgeLink.mjs';
 import { DEFAULT_TIMEOUT_MS } from '../core/approval.mjs';
 
 const CURSOR_PATH = join(CONFIG_DIR, 'cursor.json');
@@ -83,6 +83,9 @@ function payloadFor(session) {
     sessionId: session.sessionId,
     project: scrub(session.project),
     branch: scrub(branchOf(session.cwd) ?? ''),
+    // Claude Code's own name for the session. Scrubbed: the auto-name can echo
+    // work content (e.g. "fix auth bug in billing"). Empty when unnamed.
+    title: scrub(titleFor(session.sessionId) ?? ''),
     state: session.state,
     summary: summarise(raw),
     tool: scrub(session.tool ?? ''),

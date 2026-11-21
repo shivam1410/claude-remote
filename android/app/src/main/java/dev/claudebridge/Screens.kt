@@ -387,15 +387,17 @@ private fun SessionCard(session: SessionPayload, onClick: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                // The project is the group header above. The branch is the
-                // useful identifier here: Claude Code names a session's
-                // worktree branch after the work, so it reads like a title.
+                // The project is the group header above. Prefer Claude Code's
+                // own session name; fall back to the branch (worktree branches
+                // are named after the work), then the time.
                 Text(
-                    session.branch.ifEmpty {
-                        if (session.ts > 0) {
-                            DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(session.ts))
-                        } else {
-                            "session"
+                    session.title.ifEmpty {
+                        session.branch.ifEmpty {
+                            if (session.ts > 0) {
+                                DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(session.ts))
+                            } else {
+                                "session"
+                            }
                         }
                     },
                     style = MaterialTheme.typography.titleSmall,
@@ -425,7 +427,7 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(session.project.ifEmpty { "session" }) },
+                title = { Text(session.title.ifEmpty { session.project.ifEmpty { "session" } }) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")

@@ -28,6 +28,8 @@ data class SessionPayload(
     val sessionId: String,
     val project: String = "",
     val branch: String = "",
+    // Claude Code's own name for the session; empty when the session is unnamed.
+    val title: String = "",
     val state: String,
     val summary: String = "",
     val tool: String = "",

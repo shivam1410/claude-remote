@@ -26,12 +26,13 @@ object Notifications {
             return
         }
 
+        val name = session.title.ifEmpty { session.project }
         val title = when (session.state) {
-            "waiting_input" -> "${session.project} needs you"
-            "waiting_approval" -> "${session.project} wants permission"
-            "error" -> "${session.project} hit an error"
-            "done" -> "${session.project} finished"
-            else -> session.project
+            "waiting_input" -> "$name needs you"
+            "waiting_approval" -> "$name wants permission"
+            "error" -> "$name hit an error"
+            "done" -> "$name finished"
+            else -> name
         }
 
         ensureChannel(context)
