@@ -179,6 +179,29 @@ test('a reply for a session not seen yet survives the pass', async () => {
   assert.deepEqual(h.deleted, []);
 });
 
+test('a reply for a session the CLI says is gone is discarded, not looped', async () => {
+  // The orphan case: a session that never existed (or ended long ago) is not in
+  // `agents`, so the CLI reports "gone". Holding it forever reprints a log line
+  // and a wasted pass every tick, so it must be deleted once gone is confirmed.
+  sessionStates.clear();
+  const pending = { orphan: node(fresh({ sessionId: 'ghost' })) };
+  const h = harness(pending);
+
+  assert.equal(await deliverReplies({}, key, { ...h.deps, status: async () => 'gone' }), 0);
+  assert.deepEqual(h.deleted, ['orphan']);
+  assert.equal(pending.orphan, undefined);
+});
+
+test('an unknown session with an unreadable status is held, not discarded', async () => {
+  // A failed probe (null) is not proof the session is gone, so the reply waits.
+  sessionStates.clear();
+  const pending = { orphan: node(fresh({ sessionId: 'ghost' })) };
+  const h = harness(pending);
+
+  assert.equal(await deliverReplies({}, key, { ...h.deps, status: async () => null }), 0);
+  assert.deepEqual(h.deleted, []);
+});
+
 test('a failed delivery records why, and keeps the reply', async () => {
   // Three replies once sat queued for forty minutes while every attempt
   // failed on an untrusted workspace. The phone showed nothing; the reason

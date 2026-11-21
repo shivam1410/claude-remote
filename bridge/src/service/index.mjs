@@ -284,7 +284,19 @@ export async function deliverReplies(config, key, deps = {}) {
     // and that ambiguity cost an evening.
     console.log(`reply ${pushId}: ${action} (${reason})${payload ? ` -> ${payload.sessionId}` : ''}`);
 
-    if (action === 'queue') continue;
+    if (action === 'queue') {
+      // "unknown-session" means only "not seen since restart", so a reply is
+      // normally held — the session may publish any moment. But if the CLI
+      // confirms no such session exists, the reply can never be delivered, and
+      // holding it loops this log line and a delete-less pass every tick
+      // forever. Ask the CLI once; discard only on a definite "gone" (null is
+      // a failed probe, so hold and try again next pass).
+      if (reason === 'unknown-session' && (await status(payload.sessionId)) === 'gone') {
+        console.log(`reply ${pushId}: discarding, no such session ${payload.sessionId}`);
+        await deleteReply(config, pushId);
+      }
+      continue;
+    }
     if (action === 'deliver') {
       // Ask the CLI, not our own memory. Anything but a confirmed idle is a
       // reason to wait: resuming a busy session forks it.
