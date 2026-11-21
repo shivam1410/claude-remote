@@ -34,11 +34,19 @@ data class SessionPayload(
     val summary: String = "",
     val tool: String = "",
     val ts: Long = 0,
+    // Model id, e.g. "claude-opus-4-8"; empty when unknown.
+    val model: String = "",
+    // When the session process started, epoch ms; 0 when unknown.
+    val startedAt: Long = 0,
     // Present only when the session is connected to Remote Control. The URL to
     // open it in the official Claude app (or browser).
     val openUrl: String? = null,
     // The full last message, markdown preserved, for the detail view.
     val body: String = "",
+    // The open PR for this branch, when there is one.
+    val prUrl: String? = null,
+    val prNumber: Int = 0,
+    val prState: String = "",
 ) {
     val needsAttention: Boolean get() = state == "waiting_input" || state == "waiting_approval"
 }

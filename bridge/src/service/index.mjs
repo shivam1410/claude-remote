@@ -16,7 +16,7 @@ import { randomUUID } from 'node:crypto';
 import { load, SPOOL_DIR, CONFIG_DIR } from './config.mjs';
 import { drain, readCursor, writeCursor } from './spool.mjs';
 import { fold, projectLabel, workspaceRoot, stateForEvent, PUSH_STATES } from './sessionState.mjs';
-import { lastAssistantMessage } from './transcript.mjs';
+import { lastAssistantMessage, modelOf } from './transcript.mjs';
 import { summarise } from '../core/summarise.mjs';
 import { seal, open as unseal, generateKey } from '../core/crypto.mjs';
 import { scrub } from '../core/scrub.mjs';
@@ -24,7 +24,8 @@ import * as db from './db.mjs';
 import * as fcm from './fcm.mjs';
 import * as keychain from './keychain.mjs';
 import { decode, classify, deliver, liveStatus, halt } from './inject.mjs';
-import { deepLinkFor, titleFor, liveSessionIds } from './bridgeLink.mjs';
+import { deepLinkFor, titleFor, startedAtFor, liveSessionIds } from './bridgeLink.mjs';
+import { prFor } from './pr.mjs';
 import { DEFAULT_TIMEOUT_MS } from '../core/approval.mjs';
 
 const CURSOR_PATH = join(CONFIG_DIR, 'cursor.json');
@@ -87,10 +88,14 @@ async function sharedKey() {
 /** The plaintext the phone will see once it decrypts. Scrubbed, never raw. */
 function payloadFor(session) {
   const raw = session.message || lastAssistantMessage(session.transcriptPath);
+  const branch = branchOf(session.cwd) ?? '';
+  // The PR is looked up against the real branch, not the scrubbed label; the
+  // chip's url/number/state are public GitHub facts, not work content.
+  const pr = branch ? prFor(workspaceRoot(session.cwd) ?? session.cwd, branch) : null;
   return {
     sessionId: session.sessionId,
     project: scrub(session.project),
-    branch: scrub(branchOf(session.cwd) ?? ''),
+    branch: scrub(branch),
     // Claude Code's own name for the session. Scrubbed: the auto-name can echo
     // work content (e.g. "fix auth bug in billing"). Empty when unnamed.
     title: scrub(titleFor(session.sessionId) ?? ''),
@@ -98,6 +103,10 @@ function payloadFor(session) {
     summary: summarise(raw),
     tool: scrub(session.tool ?? ''),
     ts: session.ts,
+    // The model id (e.g. "claude-opus-4-8"); not work content, shown as a chip.
+    model: modelOf(session.transcriptPath),
+    // When the session process started, epoch ms, so the phone shows elapsed.
+    startedAt: startedAtFor(session.sessionId) ?? 0,
     // The full last message, markdown kept (tables, links, lists), secrets
     // still scrubbed — the org rule redacts before any sink, encrypted or not.
     // Capped so the sealed blob stays under the 4096 database-rule limit; a
@@ -107,6 +116,8 @@ function payloadFor(session) {
     // open it in the official Claude app. Not scrubbed — it is a claude.ai
     // session id, not work content — but still sealed with everything else.
     ...(deepLinkFor(session.sessionId) && { openUrl: deepLinkFor(session.sessionId) }),
+    // The open PR for this branch, when there is one. Public GitHub facts.
+    ...(pr && { prUrl: pr.url, prNumber: pr.number, prState: pr.state }),
   };
 }
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { lastAssistantMessage } from '../src/service/transcript.mjs';
+import { lastAssistantMessage, modelOf } from '../src/service/transcript.mjs';
 
 function transcript(lines) {
   const dir = mkdtempSync(join(tmpdir(), 'bridge-tx-'));
@@ -53,5 +53,24 @@ test('returns empty when there is no assistant text at all', () => {
     { type: 'user', message: { content: [{ type: 'text', text: 'hi' }] } },
   ]);
   assert.equal(lastAssistantMessage(path), '');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('modelOf returns the most recent assistant model', () => {
+  const { dir, path } = transcript([
+    { type: 'assistant', message: { model: 'claude-sonnet-4-6', content: [{ type: 'text', text: 'a' }] } },
+    { type: 'user', message: { content: [{ type: 'text', text: 'q' }] } },
+    { type: 'assistant', message: { model: 'claude-opus-4-8', content: [{ type: 'text', text: 'b' }] } },
+  ]);
+  assert.equal(modelOf(path), 'claude-opus-4-8');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('modelOf is empty when no assistant record carries a model', () => {
+  const { dir, path } = transcript([
+    { type: 'user', message: { content: [{ type: 'text', text: 'hi' }] } },
+  ]);
+  assert.equal(modelOf(path), '');
+  assert.equal(modelOf('/nope.jsonl'), '');
   rmSync(dir, { recursive: true, force: true });
 });

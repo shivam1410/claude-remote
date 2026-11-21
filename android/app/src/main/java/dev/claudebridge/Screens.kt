@@ -5,6 +5,8 @@ import android.net.Uri
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -546,14 +548,68 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit) {
                     )
                 }
             }
-            if (session.branch.isNotEmpty()) {
-                Text(session.branch, style = MaterialTheme.typography.labelMedium)
-            }
+            SessionChips(session)
             val content = session.body.ifEmpty { session.summary }.ifEmpty { "Nothing said yet." }
             MarkdownBody(content, Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
         }
     }
+}
+
+/** Short facts about the session as wrapping chips: branch, model, uptime, tool. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SessionChips(session: SessionPayload) {
+    val context = LocalContext.current
+    val chips = buildList {
+        if (session.branch.isNotEmpty()) add("⎇ ${session.branch}")
+        // "claude-opus-4-8" -> "opus-4-8": the vendor prefix is noise on a chip.
+        if (session.model.isNotEmpty()) add(session.model.removePrefix("claude-"))
+        if (session.startedAt > 0) {
+            add(
+                "started " + DateUtils.getRelativeTimeSpanString(
+                    session.startedAt,
+                    System.currentTimeMillis(),
+                    DateUtils.MINUTE_IN_MILLIS,
+                ),
+            )
+        }
+        if (session.tool.isNotEmpty()) add("⚒ ${session.tool}")
+    }
+    val prUrl = session.prUrl
+    if (chips.isEmpty() && prUrl == null) return
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // The PR chip is tappable: it opens the pull request in the browser.
+        if (prUrl != null) {
+            val label = buildString {
+                append("PR #${session.prNumber}")
+                if (session.prState.isNotEmpty()) append(" ${session.prState.lowercase()}")
+            }
+            InfoChip(label) {
+                runCatching {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(prUrl))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            }
+        }
+        for (chip in chips) InfoChip(chip)
+    }
+}
+
+@Composable
+private fun InfoChip(label: String, onClick: (() -> Unit)? = null) {
+    val base = Modifier
+        .clip(RoundedCornerShape(8.dp))
+        .background(MaterialTheme.colorScheme.surfaceVariant)
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = (if (onClick != null) base.clickable(onClick = onClick) else base)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
 }
 
 /**

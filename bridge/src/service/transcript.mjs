@@ -66,3 +66,35 @@ export function lastAssistantMessage(path) {
   }
   return '';
 }
+
+/**
+ * The model id from the most recent assistant record (e.g. "claude-opus-4-8"),
+ * or '' when the tail holds none. Same cheap tail read as the message.
+ */
+export function modelOf(path) {
+  if (typeof path !== 'string' || path === '') return '';
+
+  let tail;
+  try {
+    tail = readTail(path);
+  } catch {
+    return '';
+  }
+
+  const lines = tail.split('\n');
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i].trim();
+    if (!line.startsWith('{')) continue;
+
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (entry?.type === 'assistant' && typeof entry?.message?.model === 'string') {
+      return entry.message.model;
+    }
+  }
+  return '';
+}

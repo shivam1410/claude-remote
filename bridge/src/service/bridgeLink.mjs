@@ -45,8 +45,9 @@ export function readRecords(dir = SESSIONS_DIR) {
         && record.bridgeSessionId !== '' ? record.bridgeSessionId : null;
       const title = typeof record.name === 'string' && record.name !== ''
         ? record.name : null;
-      if (bridgeSessionId || title) {
-        map.set(record.sessionId, { bridgeSessionId, title });
+      const startedAt = Number.isFinite(record.startedAt) ? record.startedAt : null;
+      if (bridgeSessionId || title || startedAt) {
+        map.set(record.sessionId, { bridgeSessionId, title, startedAt });
       }
     } catch {
       // One bad file must not lose the rest.
@@ -91,6 +92,11 @@ export function deepLinkFor(sessionId, now = Date.now()) {
 /** The session's display title (Claude Code's auto-name), or null. */
 export function titleFor(sessionId, now = Date.now()) {
   return recordFor(sessionId, now)?.title ?? null;
+}
+
+/** When the session process started, in epoch ms, or null. */
+export function startedAtFor(sessionId, now = Date.now()) {
+  return recordFor(sessionId, now)?.startedAt ?? null;
 }
 
 /** True when a process with this pid exists (EPERM still means it is alive). */
