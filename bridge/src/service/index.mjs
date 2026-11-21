@@ -47,6 +47,9 @@ const SESSION_TTL_MS = 10 * 60 * 1000;
 // The sweep reads the whole sessions directory and checks pids, so it runs far
 // less often than the 2s poll.
 const SWEEP_INTERVAL_MS = 60 * 1000;
+// The refresh re-seals session nodes whose record-derived fields changed, so it
+// is throttled the same way.
+const REFRESH_INTERVAL_MS = 60 * 1000;
 const POLL_MS = 2000;
 const PAYLOAD_VERSION = 1;
 
@@ -181,6 +184,9 @@ const lastPushedTs = new Map();
 // When the stale-session sweep last ran, so it is throttled to SWEEP_INTERVAL_MS
 // rather than every poll.
 let lastSweepAt = 0;
+
+// When the node refresh last ran, throttled to REFRESH_INTERVAL_MS.
+let lastRefreshAt = 0;
 
 /**
  * The newest actionable event per session in a raw batch.
@@ -556,6 +562,74 @@ export async function pruneStaleSessions(config, deps = {}) {
 }
 
 /**
+ * Catch a live session's node up with its record.
+ *
+ * `openUrl`, `title` and `origin` come from the session record (bridgeLink),
+ * not the transcript, and a node is written only when the session emits an
+ * event. So a session that connects to Remote Control — or is renamed — while
+ * idle keeps a stale node: the "Open in Claude" button never appears because
+ * `openUrl` is absent, even though the record now has the id.
+ *
+ * Rather than rebuild the whole payload (which would need the transcript), this
+ * decrypts the stored node, overlays only the record-derived fields, and
+ * re-seals when one actually changed. Live sessions only — a dead one is the
+ * sweep's job, not something to grow a button on.
+ */
+export async function refreshSessions(config, key, deps = {}) {
+  const {
+    listSessions = db.listSessions,
+    putSession = db.putSession,
+    live = liveSessionIds,
+    openUrlFor = deepLinkFor,
+    nameFor = titleFor,
+    launchedFrom = originFor,
+  } = deps;
+
+  const nodes = await listSessions(config);
+  if (!nodes) return 0;
+  const alive = live();
+
+  let refreshed = 0;
+  for (const [sessionId, node] of Object.entries(nodes)) {
+    if (!alive.has(sessionId) || typeof node?.blob !== 'string') continue;
+
+    let payload;
+    try {
+      payload = unseal(key, node.blob);
+    } catch {
+      // Sealed with an older key, or corrupt. The sweep handles the dead; a
+      // node we cannot read is not ours to rewrite.
+      continue;
+    }
+
+    const url = openUrlFor(sessionId) ?? undefined;
+    const title = scrub(nameFor(sessionId) ?? '');
+    const origin = launchedFrom(sessionId) ?? '';
+    // Only the arrival of a value is interesting here. Removal (a session that
+    // left Remote Control) is rare and not worth a write every pass.
+    const gainedUrl = url && url !== payload.openUrl;
+    const gainedTitle = title !== '' && title !== payload.title;
+    const gainedOrigin = origin !== '' && origin !== payload.origin;
+    if (!gainedUrl && !gainedTitle && !gainedOrigin) continue;
+
+    const next = {
+      ...payload,
+      ...(gainedUrl && { openUrl: url }),
+      ...(gainedTitle && { title }),
+      ...(gainedOrigin && { origin }),
+    };
+    await putSession(config, sessionId, {
+      v: PAYLOAD_VERSION,
+      updatedAt: node.updatedAt ?? Date.now(),
+      blob: seal(key, next),
+    });
+    refreshed += 1;
+  }
+  if (refreshed > 0) console.log(`refreshed ${refreshed} session node(s)`);
+  return refreshed;
+}
+
+/**
  * Touch the heartbeat. A hook refuses to wait for a decision unless this file
  * is fresh, so a dead service costs a session no latency at all.
  */
@@ -577,6 +651,7 @@ export async function tick(config, key, deps = {}) {
     deliverCommands: runCommands = deliverCommands,
     prunePushes: runPrune = prunePushes,
     pruneStaleSessions: runSweep = pruneStaleSessions,
+    refreshSessions: runRefresh = refreshSessions,
   } = deps;
   beat();
 
@@ -599,6 +674,14 @@ export async function tick(config, key, deps = {}) {
       if (at - lastSweepAt < SWEEP_INTERVAL_MS) return;
       lastSweepAt = at;
       await runSweep(config);
+    }],
+    ['refreshSessions', async () => {
+      // Throttled like the sweep: it lists and decrypts every node, far heavier
+      // than the 2s poll, and the fields it catches up on change rarely.
+      const at = Date.now();
+      if (at - lastRefreshAt < REFRESH_INTERVAL_MS) return;
+      lastRefreshAt = at;
+      await runRefresh(config, key);
     }],
   ]) {
     try {

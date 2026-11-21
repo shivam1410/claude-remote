@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tick, prunePushes, pruneStaleSessions } from '../src/service/index.mjs';
+import { tick, prunePushes, pruneStaleSessions, refreshSessions } from '../src/service/index.mjs';
+import { seal, open } from '../src/core/crypto.mjs';
 
 const config = { databaseUrl: 'https://example.invalid' };
 const key = Buffer.alloc(32, 7);
@@ -19,6 +20,7 @@ test('a failing publish still lets replies and decisions through', async () => {
       deliverCommands: async () => 0,
       prunePushes: async () => 0,
       pruneStaleSessions: async () => 0,
+      refreshSessions: async () => 0,
     }),
     /publish: 401 Permission denied/,
   );
@@ -34,6 +36,7 @@ test('every stage failing is reported in one error, not just the first', async (
       deliverCommands: async () => 0,
       prunePushes: async () => 0,
       pruneStaleSessions: async () => 0,
+      refreshSessions: async () => 0,
     }),
     (error) => error.message.includes('publish: a')
       && error.message.includes('relayDecisions: b')
@@ -49,6 +52,7 @@ test('a clean pass returns what publish touched', async () => {
     deliverCommands: async () => 0,
     prunePushes: async () => 0,
     pruneStaleSessions: async () => 0,
+    refreshSessions: async () => 0,
   });
   assert.equal(touched, 4);
 });
@@ -73,6 +77,59 @@ test('pruneStaleSessions drops a dead, stale session but keeps live and fresh on
 
   assert.equal(pruned, 2);
   assert.deepEqual(deleted.sort(), ['dead', 'noTs']);
+});
+
+test('refreshSessions catches a live node up with a late Remote Control id', async () => {
+  const stale = { v: 1, updatedAt: 123, blob: seal(key, { v: 1, sessionId: 's1', state: 'waiting_input', title: '', origin: '' }) };
+  const put = [];
+
+  const n = await refreshSessions(config, key, {
+    listSessions: async () => ({ s1: stale }),
+    putSession: async (_c, id, node) => put.push([id, node]),
+    live: () => new Set(['s1']),
+    openUrlFor: (id) => (id === 's1' ? 'https://claude.ai/code/abc' : null),
+    nameFor: () => 'Fix thing',
+    launchedFrom: () => 'cli',
+  });
+
+  assert.equal(n, 1);
+  assert.equal(put.length, 1);
+  const payload = open(key, put[0][1].blob);
+  assert.equal(payload.openUrl, 'https://claude.ai/code/abc');
+  assert.equal(payload.title, 'Fix thing');
+  assert.equal(payload.origin, 'cli');
+  // The timestamp is preserved so the node does not look freshly touched.
+  assert.equal(put[0][1].updatedAt, 123);
+});
+
+test('refreshSessions rewrites nothing when the record-derived fields are unchanged', async () => {
+  const current = { v: 1, updatedAt: 1, blob: seal(key, { v: 1, sessionId: 's1', state: 'waiting_input', title: 'Fix thing', origin: 'cli', openUrl: 'https://claude.ai/code/abc' }) };
+  const put = [];
+  const n = await refreshSessions(config, key, {
+    listSessions: async () => ({ s1: current }),
+    putSession: async (_c, id, node) => put.push([id, node]),
+    live: () => new Set(['s1']),
+    openUrlFor: () => 'https://claude.ai/code/abc',
+    nameFor: () => 'Fix thing',
+    launchedFrom: () => 'cli',
+  });
+  assert.equal(n, 0);
+  assert.deepEqual(put, []);
+});
+
+test('refreshSessions leaves a dead session alone', async () => {
+  const stale = { v: 1, updatedAt: 1, blob: seal(key, { v: 1, sessionId: 'dead', state: 'waiting_input', title: '', origin: '' }) };
+  const put = [];
+  const n = await refreshSessions(config, key, {
+    listSessions: async () => ({ dead: stale }),
+    putSession: async (_c, id, node) => put.push([id, node]),
+    live: () => new Set(), // nothing alive
+    openUrlFor: () => 'https://claude.ai/code/abc',
+    nameFor: () => 'name',
+    launchedFrom: () => 'cli',
+  });
+  assert.equal(n, 0);
+  assert.deepEqual(put, []);
 });
 
 test('prunePushes drops only what has gone stale', async () => {
