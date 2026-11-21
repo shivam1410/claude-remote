@@ -29,7 +29,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -177,6 +179,31 @@ fun AccountMenu(
 }
 
 @Composable
+private fun SortMenu(sortMode: SortMode, onSortChange: (SortMode) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+
+    IconButton(onClick = { open = true }) {
+        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort sessions")
+    }
+
+    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        for (mode in SortMode.entries) {
+            DropdownMenuItem(
+                text = { Text(mode.label) },
+                // A check marks the active mode; others leave the slot empty so
+                // the labels still line up.
+                leadingIcon = {
+                    if (mode == sortMode) {
+                        Icon(Icons.Filled.Check, contentDescription = null)
+                    }
+                },
+                onClick = { open = false; onSortChange(mode) },
+            )
+        }
+    }
+}
+
+@Composable
 fun UpdateRow(state: UpdateState, onCheck: () -> Unit, onInstall: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         when (state) {
@@ -274,6 +301,8 @@ fun SessionListScreen(
     // True until the first snapshot lands, so the empty state is not shown while
     // the live query is still in flight. No local cache — just a loading gate.
     loading: Boolean,
+    sortMode: SortMode,
+    onSortChange: (SortMode) -> Unit,
     onOpen: (SessionPayload) -> Unit,
     onDecide: (ApprovalPayload, Boolean) -> Unit,
     onUnpair: () -> Unit,
@@ -296,6 +325,8 @@ fun SessionListScreen(
                     }
                 },
                 actions = {
+                    // Sort control sits left of the account avatar.
+                    SortMenu(sortMode, onSortChange)
                     AccountMenu(
                         email = accountEmail,
                         photoUrl = accountPhotoUrl,
@@ -308,14 +339,7 @@ fun SessionListScreen(
             )
         },
     ) { padding ->
-        val grouped = remember(sessions) {
-            sessions
-                .groupBy { it.project.ifEmpty { "unknown" } }
-                // Newest first inside a project, projects alphabetical, so the
-                // list does not reshuffle every time a session ticks.
-                .mapValues { (_, group) -> group.sortedByDescending { it.ts } }
-                .toSortedMap()
-        }
+        val grouped = remember(sessions, sortMode) { SessionSort.group(sessions, sortMode) }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
