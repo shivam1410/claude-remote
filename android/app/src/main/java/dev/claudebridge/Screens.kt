@@ -41,6 +41,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -269,6 +270,9 @@ fun SetupScreen(
 fun SessionListScreen(
     sessions: List<SessionPayload>,
     approvals: List<ApprovalPayload>,
+    // True until the first snapshot lands, so the empty state is not shown while
+    // the live query is still in flight. No local cache — just a loading gate.
+    loading: Boolean,
     onOpen: (SessionPayload) -> Unit,
     onDecide: (ApprovalPayload, Boolean) -> Unit,
     onUnpair: () -> Unit,
@@ -340,11 +344,22 @@ fun SessionListScreen(
 
             if (sessions.isEmpty() && approvals.isEmpty()) {
                 item {
-                    Text(
-                        "No sessions running. A session appears here as soon as " +
-                            "one starts on the Mac.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    if (loading) {
+                        // First snapshot still in flight: a spinner, not the
+                        // "nothing running" copy, so the empty state never flashes.
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    } else {
+                        Text(
+                            "No sessions running. A session appears here as soon as " +
+                                "one starts on the Mac.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
             }
 

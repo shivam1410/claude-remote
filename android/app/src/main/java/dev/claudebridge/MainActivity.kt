@@ -170,7 +170,12 @@ fun BridgeApp(initialSessionId: String?) {
         return
     }
 
-    val sessions by repo.sessions.collectAsStateWithLifecycle(emptyList())
+    // null until the first RTDB snapshot lands: lets the list show a spinner
+    // instead of the empty state while the live query is still in flight. No
+    // local cache — the data is never persisted on the phone.
+    val sessionsOrNull by repo.sessions.collectAsStateWithLifecycle(null)
+    val sessions = sessionsOrNull ?: emptyList()
+    val loading = sessionsOrNull == null
     val approvals by repo.approvals.collectAsStateWithLifecycle(emptyList())
 
     val open = sessions.firstOrNull { it.sessionId == selected }
@@ -186,6 +191,7 @@ fun BridgeApp(initialSessionId: String?) {
         SessionListScreen(
             sessions = sessions,
             approvals = approvals,
+            loading = loading,
             onOpen = { selected = it.sessionId },
             onDecide = { approval, allow ->
                 scope.launch { runCatching { repo.decide(approval.requestId, allow) } }
