@@ -51,8 +51,8 @@ object Notifications {
             // Claude's coral tints the small icon and the action label.
             .setColor(0xFFD97757.toInt())
             .setContentTitle(title)
-            .setContentText(session.summary.ifEmpty { session.state })
-            .setStyle(NotificationCompat.BigTextStyle().bigText(session.summary))
+            .setContentText(plainText(session.summary).ifEmpty { session.state })
+            .setStyle(NotificationCompat.BigTextStyle().bigText(plainText(session.summary)))
             .setAutoCancel(true)
             .setContentIntent(tap)
 
@@ -82,6 +82,17 @@ object Notifications {
             // POST_NOTIFICATIONS not granted. The in-app list still works.
         }
     }
+
+    // A notification is plain text: the Compose list renders markdown, but here
+    // "**tetet**" would show its asterisks. Strip the common inline markers
+    // (bold, italic, code, links) so the body reads clean.
+    private fun plainText(md: String): String =
+        md.replace(Regex("""\*\*(.*?)\*\*"""), "$1")
+            .replace(Regex("""__(.*?)__"""), "$1")
+            .replace(Regex("""(?<!\*)\*(?!\*)(.+?)\*"""), "$1")
+            .replace(Regex("""`([^`]*)`"""), "$1")
+            .replace(Regex("""\[([^\]]+)]\([^)]+\)"""), "$1")
+            .trim()
 
     private fun ensureChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
