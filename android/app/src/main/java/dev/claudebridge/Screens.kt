@@ -690,7 +690,12 @@ private fun SessionChips(session: SessionPayload) {
     }
     val prUrl = session.prUrl
     if (chips.isEmpty() && prUrl == null) return
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        // Without this, chips that wrap to a second line sit flush against the
+        // first row; the gap matches the horizontal one.
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         // The PR chip is tappable: it opens the pull request in the browser.
         if (prUrl != null) {
             val label = buildString {
