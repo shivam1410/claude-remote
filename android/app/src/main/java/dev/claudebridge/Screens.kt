@@ -72,7 +72,9 @@ import android.widget.TextView
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
+import io.noties.markwon.AbstractMarkwonPlugin
 import io.noties.markwon.Markwon
+import io.noties.markwon.core.MarkwonTheme
 import io.noties.markwon.ext.tables.TablePlugin
 import io.noties.markwon.linkify.LinkifyPlugin
 import androidx.compose.ui.draw.clip
@@ -760,13 +762,28 @@ private fun StateTag(state: String) {
 @Composable
 private fun MarkdownBody(text: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val markwon = remember(context) {
+    val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
+    val codeTextColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
+    val codeBlockBg = MaterialTheme.colorScheme.surfaceVariant.toArgb()
+    val markwon = remember(context, codeTextColor, codeBlockBg) {
         Markwon.builder(context)
             .usePlugin(TablePlugin.create(context))
             .usePlugin(LinkifyPlugin.create())
+            .usePlugin(object : AbstractMarkwonPlugin() {
+                override fun configureTheme(builder: MarkwonTheme.Builder) {
+                    builder
+                        // No inline-code highlight: its background broke across
+                        // wrapped lines into blotchy blocks. Monospace plus a
+                        // muted colour sets code apart without the mess.
+                        .codeBackgroundColor(0)
+                        .codeTextColor(codeTextColor)
+                        // Blocks keep one clean panel — they do not wrap-blotch.
+                        .codeBlockBackgroundColor(codeBlockBg)
+                        .codeBlockTextColor(textColor)
+                }
+            })
             .build()
     }
-    val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
