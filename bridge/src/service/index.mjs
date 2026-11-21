@@ -24,7 +24,7 @@ import * as db from './db.mjs';
 import * as fcm from './fcm.mjs';
 import * as keychain from './keychain.mjs';
 import { decode, classify, deliver, liveStatus, halt } from './inject.mjs';
-import { deepLinkFor, titleFor } from './bridgeLink.mjs';
+import { deepLinkFor, titleFor, liveSessionIds } from './bridgeLink.mjs';
 import { DEFAULT_TIMEOUT_MS } from '../core/approval.mjs';
 
 const CURSOR_PATH = join(CONFIG_DIR, 'cursor.json');
@@ -37,6 +37,14 @@ const APPROVAL_TTL_MS = DEFAULT_TIMEOUT_MS + 30_000;
 // noise, and with no consumer deployed it is unbounded growth: the node sat
 // at 46 and climbing with nothing reading it.
 const PUSH_TTL_MS = 10 * 60 * 1000;
+// A session node is deleted at SessionEnd. The sweep is the backstop for a
+// session that died without it (crash, kill, or an archive/delete that stopped
+// the process): once its pid is gone and the node has not been touched for this
+// long, drop it. Generous, so a live idle session is never swept by mistake.
+const SESSION_TTL_MS = 10 * 60 * 1000;
+// The sweep reads the whole sessions directory and checks pids, so it runs far
+// less often than the 2s poll.
+const SWEEP_INTERVAL_MS = 60 * 1000;
 const POLL_MS = 2000;
 const PAYLOAD_VERSION = 1;
 
@@ -154,6 +162,10 @@ export const sessionStates = new Map();
 // on a folded state string, is what stops a turn-end Stop being swallowed when
 // the next turn's first tool call lands in the same poll batch.
 const lastPushedTs = new Map();
+
+// When the stale-session sweep last ran, so it is throttled to SWEEP_INTERVAL_MS
+// rather than every poll.
+let lastSweepAt = 0;
 
 /**
  * The newest actionable event per session in a raw batch.
@@ -430,6 +442,41 @@ export async function prunePushes(config, deps = {}) {
 }
 
 /**
+ * Drop session nodes whose owning process is gone and that have not been
+ * touched for SESSION_TTL_MS. The backstop for a session that ended without a
+ * SessionEnd hook (crash, kill, or an app archive/delete that stopped it), so
+ * it stops lingering on the phone. A live session is never swept: it is either
+ * in the live-pid set or its node is fresh.
+ */
+export async function pruneStaleSessions(config, deps = {}) {
+  const {
+    listSessions = db.listSessions,
+    deleteSession = db.deleteSession,
+    live = liveSessionIds,
+    now = Date.now(),
+  } = deps;
+
+  const nodes = await listSessions(config);
+  if (!nodes) return 0;
+  const alive = live();
+
+  let pruned = 0;
+  for (const [sessionId, node] of Object.entries(nodes)) {
+    if (alive.has(sessionId)) continue;
+    const updatedAt = Number(node?.updatedAt);
+    if (!Number.isFinite(updatedAt) || now - updatedAt > SESSION_TTL_MS) {
+      await deleteSession(config, sessionId);
+      sessionStates.delete(sessionId);
+      sessionCwds.delete(sessionId);
+      lastPushedTs.delete(sessionId);
+      pruned += 1;
+    }
+  }
+  if (pruned > 0) console.log(`pruned ${pruned} stale session(s)`);
+  return pruned;
+}
+
+/**
  * Touch the heartbeat. A hook refuses to wait for a decision unless this file
  * is fresh, so a dead service costs a session no latency at all.
  */
@@ -449,6 +496,7 @@ export async function tick(config, key, deps = {}) {
     relayDecisions: runRelay = relayDecisions,
     deliverReplies: runDeliver = deliverReplies,
     prunePushes: runPrune = prunePushes,
+    pruneStaleSessions: runSweep = pruneStaleSessions,
   } = deps;
   beat();
 
@@ -463,6 +511,14 @@ export async function tick(config, key, deps = {}) {
     ['relayDecisions', () => runRelay(config, key)],
     ['deliverReplies', () => runDeliver(config, key)],
     ['prunePushes', () => runPrune(config)],
+    ['pruneStaleSessions', async () => {
+      // Throttled: the sweep reads the sessions directory and checks pids, far
+      // heavier than the 2s poll it rides on.
+      const at = Date.now();
+      if (at - lastSweepAt < SWEEP_INTERVAL_MS) return;
+      lastSweepAt = at;
+      await runSweep(config);
+    }],
   ]) {
     try {
       await run();

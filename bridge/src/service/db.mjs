@@ -37,6 +37,11 @@ export function deleteSession(config, sessionId) {
   return request(config, 'DELETE', `/sessions/${sessionId}`);
 }
 
+/** Every session node, so the stale-session sweep can age orphaned ones. */
+export function listSessions(config) {
+  return request(config, 'GET', '/sessions');
+}
+
 /** Read every pending reply. */
 export function listReplies(config) {
   return request(config, 'GET', '/replies');

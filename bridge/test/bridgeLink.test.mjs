@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readLinks, readRecords } from '../src/service/bridgeLink.mjs';
+import { readLinks, readRecords, liveSessionIds } from '../src/service/bridgeLink.mjs';
 
 function fixtureDir(files) {
   const dir = mkdtempSync(join(tmpdir(), 'cb-links-'));
@@ -46,6 +46,24 @@ test('one unreadable file does not lose the others', () => {
 
 test('a missing directory is empty, not an error', () => {
   assert.equal(readLinks('/no/such/dir/anywhere').size, 0);
+});
+
+test('liveSessionIds keeps only sessions whose pid is alive', () => {
+  const dir = fixtureDir({
+    '1.json': { sessionId: 'aaa', pid: 111 },
+    '2.json': { sessionId: 'bbb', pid: 222 }, // pid dead
+    '3.json': { sessionId: 'ccc' }, // no pid: cannot be confirmed alive
+    'bad.json': '{ not json',
+  });
+  try {
+    const alive = liveSessionIds(dir, (pid) => pid === 111);
+    assert.equal(alive.has('aaa'), true);
+    assert.equal(alive.has('bbb'), false);
+    assert.equal(alive.has('ccc'), false);
+    assert.equal(alive.size, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('readRecords carries the title even without a bridge id', () => {

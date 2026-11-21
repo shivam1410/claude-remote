@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tick, prunePushes } from '../src/service/index.mjs';
+import { tick, prunePushes, pruneStaleSessions } from '../src/service/index.mjs';
 
 const config = { databaseUrl: 'https://example.invalid' };
 const key = Buffer.alloc(32, 7);
@@ -17,6 +17,7 @@ test('a failing publish still lets replies and decisions through', async () => {
       relayDecisions: () => { ran.push('relay'); },
       deliverReplies: () => { ran.push('deliver'); },
       prunePushes: async () => 0,
+      pruneStaleSessions: async () => 0,
     }),
     /publish: 401 Permission denied/,
   );
@@ -30,6 +31,7 @@ test('every stage failing is reported in one error, not just the first', async (
       relayDecisions: () => { throw new Error('b'); },
       deliverReplies: () => { throw new Error('c'); },
       prunePushes: async () => 0,
+      pruneStaleSessions: async () => 0,
     }),
     (error) => error.message.includes('publish: a')
       && error.message.includes('relayDecisions: b')
@@ -43,8 +45,31 @@ test('a clean pass returns what publish touched', async () => {
     relayDecisions: async () => {},
     deliverReplies: async () => {},
     prunePushes: async () => 0,
+    pruneStaleSessions: async () => 0,
   });
   assert.equal(touched, 4);
+});
+
+test('pruneStaleSessions drops a dead, stale session but keeps live and fresh ones', async () => {
+  const now = 1_800_000_000_000;
+  const old = now - 11 * 60 * 1000; // past SESSION_TTL_MS (10 min)
+  const fresh = now - 60 * 1000; // within it
+  const deleted = [];
+
+  const pruned = await pruneStaleSessions(config, {
+    listSessions: async () => ({
+      dead: { updatedAt: old }, // process gone, stale -> delete
+      aliveIdle: { updatedAt: old }, // process alive, stale -> keep
+      deadFresh: { updatedAt: fresh }, // process gone, fresh -> keep
+      noTs: {}, // process gone, no timestamp -> delete
+    }),
+    live: () => new Set(['aliveIdle']),
+    deleteSession: async (_config, sessionId) => { deleted.push(sessionId); },
+    now,
+  });
+
+  assert.equal(pruned, 2);
+  assert.deepEqual(deleted.sort(), ['dead', 'noTs']);
 });
 
 test('prunePushes drops only what has gone stale', async () => {

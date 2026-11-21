@@ -92,3 +92,42 @@ export function deepLinkFor(sessionId, now = Date.now()) {
 export function titleFor(sessionId, now = Date.now()) {
   return recordFor(sessionId, now)?.title ?? null;
 }
+
+/** True when a process with this pid exists (EPERM still means it is alive). */
+function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === 'EPERM';
+  }
+}
+
+/**
+ * The sessionIds whose owning process is still running. Read straight from the
+ * session files (not the cache) so the stale sweep sees the current truth; a
+ * crashed session's process is gone even if its file lingers.
+ */
+export function liveSessionIds(dir = SESSIONS_DIR, isAlive = pidAlive) {
+  const ids = new Set();
+  let names;
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return ids; // no sessions dir: treat nothing as live, let the TTL decide.
+  }
+  for (const name of names) {
+    if (!name.endsWith('.json')) continue;
+    try {
+      const record = JSON.parse(readFileSync(join(dir, name), 'utf8'));
+      if (typeof record?.sessionId === 'string'
+        && Number.isInteger(record?.pid)
+        && isAlive(record.pid)) {
+        ids.add(record.sessionId);
+      }
+    } catch {
+      // One bad file must not shrink the live set and cause a wrong delete.
+    }
+  }
+  return ids;
+}
