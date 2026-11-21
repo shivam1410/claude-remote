@@ -9,6 +9,8 @@ enum class SortMode(val label: String) {
     NAME_DESC("Name Z–A"),
     RECENT_DESC("Recently updated"),
     RECENT_ASC("Oldest first"),
+    // The desktop app's own group order; unfiled sessions sit at the bottom.
+    GROUP("Sort by group"),
 }
 
 /** What the Home list groups sessions by. A per-viewer UI preference only. */
@@ -75,6 +77,13 @@ object SessionSort {
                 entries.sortedByDescending { e -> e.value.maxOf { it.ts } }
             SortMode.RECENT_ASC ->
                 entries.sortedBy { e -> e.value.maxOf { it.ts } }
+            // The app's group order: a bucket ranks by its lowest categoryRank.
+            // Unfiled sessions carry a high rank, so "Ungrouped" lands last;
+            // name breaks ties so same-rank buckets are stable.
+            SortMode.GROUP ->
+                entries.sortedWith(
+                    compareBy({ e -> e.value.minOf { it.categoryRank } }, { it.key.lowercase() }),
+                )
         }
         return ordered.map { it.key to it.value }
     }

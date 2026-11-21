@@ -92,6 +92,7 @@ test('refreshSessions catches a live node up with a late Remote Control id', asy
     launchedFrom: () => 'cli',
     groupFor: () => 'ai-backend',
     categoryOf: () => 'DEA',
+    rankOf: () => 10,
   });
 
   assert.equal(n, 1);
@@ -102,6 +103,7 @@ test('refreshSessions catches a live node up with a late Remote Control id', asy
   assert.equal(payload.origin, 'cli');
   assert.equal(payload.project, 'ai-backend');
   assert.equal(payload.category, 'DEA');
+  assert.equal(payload.categoryRank, 10);
   // The timestamp is preserved so the node does not look freshly touched.
   assert.equal(put[0][1].updatedAt, 123);
 });

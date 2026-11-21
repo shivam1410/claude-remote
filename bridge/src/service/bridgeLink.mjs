@@ -114,19 +114,28 @@ function loadCategoryMap(path = APP_CONFIG) {
   } catch {
     return map; // no config or unreadable: no categories, not an error.
   }
-  const scopes = config?.preferences?.epitaxyPrefs?.['dframe-group-scopes'];
+  const prefs = config?.preferences?.epitaxyPrefs;
+  const scopes = prefs?.['dframe-group-scopes'];
   if (!scopes || typeof scopes !== 'object') return map;
-  for (const scope of Object.values(scopes)) {
+  // The sidebar's display order per group, so "sort by group" can match the app.
+  const sections = prefs?.['dframe-code-sections'] ?? {};
+  for (const [space, scope] of Object.entries(scopes)) {
     const names = new Map();
     for (const group of scope?.groups ?? []) {
       if (group?.id && typeof group.name === 'string' && group.name !== '') {
         names.set(group.id, group.name);
       }
     }
+    const ranks = new Map();
+    for (const section of sections?.[space]?.sections ?? []) {
+      if (section?.id && Number.isFinite(section.order)) ranks.set(section.id, section.order);
+    }
     for (const [key, groupId] of Object.entries(scope?.assignments ?? {})) {
       if (!key.startsWith('code:')) continue;
       const name = names.get(groupId);
-      if (name) map.set(key.slice('code:'.length), name);
+      if (name) {
+        map.set(key.slice('code:'.length), { name, rank: ranks.get(groupId) ?? null });
+      }
     }
   }
   return map;
@@ -155,10 +164,12 @@ export function readRecords(dir = SESSIONS_DIR, appDir = APP_SESSIONS_DIR, confi
       const startedAt = Number.isFinite(record.startedAt) ? record.startedAt : null;
       const origin = originLabel(record);
       const group = appGroupLabel(record.hostSessionId, appDir);
-      const category = (typeof record.hostSessionId === 'string'
+      const cat = (typeof record.hostSessionId === 'string'
         ? categories.get(record.hostSessionId) : null) ?? null;
+      const category = cat?.name ?? null;
+      const categoryRank = cat?.rank ?? null;
       if (bridgeSessionId || title || startedAt || origin || group || category) {
-        map.set(record.sessionId, { bridgeSessionId, title, startedAt, origin, group, category });
+        map.set(record.sessionId, { bridgeSessionId, title, startedAt, origin, group, category, categoryRank });
       }
     } catch {
       // One bad file must not lose the rest.
@@ -223,6 +234,11 @@ export function appGroupFor(sessionId, now = Date.now()) {
 /** The user's sidebar group name (e.g. "DEA") for this session, or null. */
 export function categoryFor(sessionId, now = Date.now()) {
   return recordFor(sessionId, now)?.category ?? null;
+}
+
+/** The sidebar display order of this session's group, or null when unfiled. */
+export function categoryRankFor(sessionId, now = Date.now()) {
+  return recordFor(sessionId, now)?.categoryRank ?? null;
 }
 
 /** True when a process with this pid exists (EPERM still means it is alive). */

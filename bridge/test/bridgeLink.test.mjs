@@ -129,19 +129,25 @@ test('readRecords resolves the user category from the app config', () => {
   const cfgDir = mkdtempSync(join(tmpdir(), 'cb-cfg-'));
   const cfg = join(cfgDir, 'claude_desktop_config.json');
   writeFileSync(cfg, JSON.stringify({
-    preferences: { epitaxyPrefs: { 'dframe-group-scopes': {
-      'acct/org': {
-        groups: [
-          { id: 'cg-1', name: 'DEA', mode: 'code' },
-          { id: 'cg-2', name: 'Enhancement', mode: 'code' },
-        ],
-        assignments: { 'code:local_h1': 'cg-1' },
+    preferences: { epitaxyPrefs: {
+      'dframe-group-scopes': {
+        'acct/org': {
+          groups: [
+            { id: 'cg-1', name: 'DEA', mode: 'code' },
+            { id: 'cg-2', name: 'Enhancement', mode: 'code' },
+          ],
+          assignments: { 'code:local_h1': 'cg-1' },
+        },
       },
-    } } },
+      'dframe-code-sections': {
+        'acct/org': { sections: [{ id: 'cg-1', kind: 'manual', name: 'DEA', order: 10 }] },
+      },
+    } },
   }));
   try {
     const map = readRecords(sessions, '/no/app/dir', cfg);
     assert.equal(map.get('aaa').category, 'DEA');
+    assert.equal(map.get('aaa').categoryRank, 10); // from dframe-code-sections order
     assert.equal(map.get('bbb').category ?? null, null); // assigned to nothing
     assert.equal(map.get('ccc').category ?? null, null); // no hostSessionId
   } finally {

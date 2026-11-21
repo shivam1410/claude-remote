@@ -24,7 +24,10 @@ import * as db from './db.mjs';
 import * as fcm from './fcm.mjs';
 import * as keychain from './keychain.mjs';
 import { decode, classify, deliver, liveStatus, halt } from './inject.mjs';
-import { deepLinkFor, titleFor, startedAtFor, originFor, appGroupFor, categoryFor, liveSessionIds } from './bridgeLink.mjs';
+import { deepLinkFor, titleFor, startedAtFor, originFor, appGroupFor, categoryFor, categoryRankFor, liveSessionIds } from './bridgeLink.mjs';
+
+// Sessions with no user group sort after every named group under "sort by group".
+const UNGROUPED_RANK = 9999;
 import { prFor } from './pr.mjs';
 import { decode as decodeCommand, runStart } from './commands.mjs';
 import { DEFAULT_TIMEOUT_MS } from '../core/approval.mjs';
@@ -104,6 +107,9 @@ function payloadFor(session) {
     // The user's sidebar group (e.g. "DEA"), the default grouping on the phone.
     // Empty when the session is not filed under a group.
     category: scrub(categoryFor(session.sessionId) ?? ''),
+    // The group's sidebar display order, so the phone's "sort by group" matches
+    // the app; unfiled sessions get a high rank and fall to the bottom.
+    categoryRank: categoryRankFor(session.sessionId) ?? UNGROUPED_RANK,
     branch: scrub(branch),
     // Claude Code's own name for the session. Scrubbed: the auto-name can echo
     // work content (e.g. "fix auth bug in billing"). Empty when unnamed.
@@ -591,6 +597,7 @@ export async function refreshSessions(config, key, deps = {}) {
     launchedFrom = originFor,
     groupFor = appGroupFor,
     categoryOf = categoryFor,
+    rankOf = categoryRankFor,
   } = deps;
 
   const nodes = await listSessions(config);
@@ -615,6 +622,7 @@ export async function refreshSessions(config, key, deps = {}) {
     const origin = launchedFrom(sessionId) ?? '';
     const group = scrub(groupFor(sessionId) ?? '');
     const category = scrub(categoryOf(sessionId) ?? '');
+    const rank = rankOf(sessionId) ?? UNGROUPED_RANK;
     // Only the arrival of a value is interesting here. Removal (a session that
     // left Remote Control) is rare and not worth a write every pass.
     const gainedUrl = url && url !== payload.openUrl;
@@ -622,7 +630,9 @@ export async function refreshSessions(config, key, deps = {}) {
     const gainedOrigin = origin !== '' && origin !== payload.origin;
     const gainedGroup = group !== '' && group !== payload.project;
     const gainedCategory = category !== '' && category !== payload.category;
-    if (!gainedUrl && !gainedTitle && !gainedOrigin && !gainedGroup && !gainedCategory) continue;
+    // The rank only matters alongside a category, so carry it when one is set.
+    const gainedRank = category !== '' && rank !== (payload.categoryRank ?? UNGROUPED_RANK);
+    if (!gainedUrl && !gainedTitle && !gainedOrigin && !gainedGroup && !gainedCategory && !gainedRank) continue;
 
     const next = {
       ...payload,
@@ -631,6 +641,7 @@ export async function refreshSessions(config, key, deps = {}) {
       ...(gainedOrigin && { origin }),
       ...(gainedGroup && { project: group }),
       ...(gainedCategory && { category }),
+      ...(gainedRank && { categoryRank: rank }),
     };
     await putSession(config, sessionId, {
       v: PAYLOAD_VERSION,

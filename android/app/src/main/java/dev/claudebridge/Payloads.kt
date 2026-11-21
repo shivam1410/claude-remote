@@ -30,6 +30,9 @@ data class SessionPayload(
     // The user's desktop sidebar group (e.g. "DEA"); empty when unfiled. The
     // default grouping on Home. `project` (the folder) is shown as a chip.
     val category: String = "",
+    // The group's sidebar display order, for "sort by group"; unfiled sessions
+    // carry a high rank so they fall to the bottom.
+    val categoryRank: Int = 9999,
     val branch: String = "",
     // Claude Code's own name for the session; empty when the session is unnamed.
     val title: String = "",
