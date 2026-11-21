@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readLinks, readRecords, liveSessionIds } from '../src/service/bridgeLink.mjs';
@@ -9,6 +9,17 @@ function fixtureDir(files) {
   const dir = mkdtempSync(join(tmpdir(), 'cb-links-'));
   for (const [name, body] of Object.entries(files)) {
     writeFileSync(join(dir, name), typeof body === 'string' ? body : JSON.stringify(body));
+  }
+  return dir;
+}
+
+// Mirror the desktop app's layout: <account>/<org>/local_<hostSessionId>.json.
+function appDir(metaByHost, account = 'acct', org = 'org') {
+  const dir = mkdtempSync(join(tmpdir(), 'cb-app-'));
+  const inner = join(dir, account, org);
+  mkdirSync(inner, { recursive: true });
+  for (const [host, meta] of Object.entries(metaByHost)) {
+    writeFileSync(join(inner, `${host}.json`), JSON.stringify(meta));
   }
   return dir;
 }
@@ -81,6 +92,43 @@ test('readRecords carries the title even without a bridge id', () => {
     assert.equal(map.has('ccc'), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('readRecords groups by the app origin folder, matching the desktop app', () => {
+  const sessions = fixtureDir({
+    // A worktree session: its cwd is the worktree, but the app filed it under
+    // the origin project. The group must follow the origin, not the worktree.
+    '1.json': { sessionId: 'aaa', hostSessionId: 'local_h1', cwd: '/x/ai-backend/wt-123' },
+    // originCwd absent: fall back to folderPlace.cwd.
+    '2.json': { sessionId: 'bbb', hostSessionId: 'local_h2' },
+    // A CLI session with no hostSessionId gets no app group.
+    '3.json': { sessionId: 'ccc', entrypoint: 'cli', name: 'solo' },
+  });
+  const app = appDir({
+    local_h1: { originCwd: '/Users/me/Desktop/ai-backend', folderPlace: { cwd: '/x/ai-backend/wt-123' } },
+    local_h2: { folderPlace: { cwd: '/Users/me/code/dash-boards' } },
+  });
+  try {
+    const map = readRecords(sessions, app);
+    assert.equal(map.get('aaa').group, 'ai-backend');
+    assert.equal(map.get('bbb').group, 'dash-boards');
+    assert.equal(map.get('ccc').group ?? null, null);
+  } finally {
+    rmSync(sessions, { recursive: true, force: true });
+    rmSync(app, { recursive: true, force: true });
+  }
+});
+
+test('readRecords leaves group null when the app has no metadata dir', () => {
+  const sessions = fixtureDir({
+    '1.json': { sessionId: 'aaa', hostSessionId: 'local_h1', name: 'x' },
+  });
+  try {
+    const map = readRecords(sessions, '/no/such/app/dir');
+    assert.equal(map.get('aaa').group ?? null, null);
+  } finally {
+    rmSync(sessions, { recursive: true, force: true });
   }
 });
 

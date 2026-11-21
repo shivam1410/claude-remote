@@ -90,6 +90,7 @@ test('refreshSessions catches a live node up with a late Remote Control id', asy
     openUrlFor: (id) => (id === 's1' ? 'https://claude.ai/code/abc' : null),
     nameFor: () => 'Fix thing',
     launchedFrom: () => 'cli',
+    groupFor: () => 'ai-backend',
   });
 
   assert.equal(n, 1);
@@ -98,6 +99,7 @@ test('refreshSessions catches a live node up with a late Remote Control id', asy
   assert.equal(payload.openUrl, 'https://claude.ai/code/abc');
   assert.equal(payload.title, 'Fix thing');
   assert.equal(payload.origin, 'cli');
+  assert.equal(payload.project, 'ai-backend');
   // The timestamp is preserved so the node does not look freshly touched.
   assert.equal(put[0][1].updatedAt, 123);
 });
@@ -112,6 +114,7 @@ test('refreshSessions rewrites nothing when the record-derived fields are unchan
     openUrlFor: () => 'https://claude.ai/code/abc',
     nameFor: () => 'Fix thing',
     launchedFrom: () => 'cli',
+    groupFor: () => '',
   });
   assert.equal(n, 0);
   assert.deepEqual(put, []);
