@@ -796,7 +796,11 @@ private fun MarkdownBody(text: String, modifier: Modifier = Modifier) {
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
     val codeTextColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
     val codeBlockBg = MaterialTheme.colorScheme.surfaceVariant.toArgb()
-    val markwon = remember(context, codeTextColor, codeBlockBg) {
+    // The page background, used as the inline-code background so the span blends
+    // in. Markwon reads 0 as "unset" and draws its own grey tint, so the only
+    // way to kill the highlight is an opaque colour that matches the surface.
+    val pageBg = MaterialTheme.colorScheme.background.toArgb()
+    val markwon = remember(context, codeTextColor, codeBlockBg, pageBg) {
         Markwon.builder(context)
             .usePlugin(TablePlugin.create(context))
             .usePlugin(LinkifyPlugin.create())
@@ -804,9 +808,11 @@ private fun MarkdownBody(text: String, modifier: Modifier = Modifier) {
                 override fun configureTheme(builder: MarkwonTheme.Builder) {
                     builder
                         // No inline-code highlight: its background broke across
-                        // wrapped lines into blotchy blocks. Monospace plus a
-                        // muted colour sets code apart without the mess.
-                        .codeBackgroundColor(0)
+                        // wrapped lines into blotchy blocks. Match the page so
+                        // the span is invisible; monospace plus a muted colour
+                        // sets code apart without the mess. (0 does not work —
+                        // Markwon reads it as unset and draws a grey default.)
+                        .codeBackgroundColor(pageBg)
                         .codeTextColor(codeTextColor)
                         // Blocks keep one clean panel — they do not wrap-blotch.
                         .codeBlockBackgroundColor(codeBlockBg)
