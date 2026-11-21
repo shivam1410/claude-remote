@@ -24,6 +24,11 @@ const SESSIONS_DIR = process.env.CLAUDE_BRIDGE_SESSIONS_DIR
 const APP_SESSIONS_DIR = process.env.CLAUDE_BRIDGE_APP_SESSIONS_DIR
   ?? join(homedir(), 'Library', 'Application Support', 'Claude', 'claude-code-sessions');
 
+// The desktop app's config, holding the user's sidebar groups and which session
+// is in each. Plain JSON (unlike the Chromium stores), so it reads reliably.
+const APP_CONFIG = process.env.CLAUDE_BRIDGE_APP_CONFIG
+  ?? join(homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+
 // The map is rebuilt at most this often: the files change only when a session
 // connects or is renamed, which is rare next to the tick rate.
 const CACHE_MS = 5_000;
@@ -94,7 +99,40 @@ function appGroupLabel(hostSessionId, dir = APP_SESSIONS_DIR) {
   return null;
 }
 
-export function readRecords(dir = SESSIONS_DIR, appDir = APP_SESSIONS_DIR) {
+/**
+ * Map hostSessionId -> the user's sidebar group name, from the desktop app's
+ * config. The app files each session under a manual group, stored as
+ * preferences.epitaxyPrefs["dframe-group-scopes"][space] = { groups, assignments },
+ * where an assignment key is "code:<hostSessionId>" and its value is a group id.
+ * Built once per records read; empty on any missing or unreadable config.
+ */
+function loadCategoryMap(path = APP_CONFIG) {
+  const map = new Map();
+  let config;
+  try {
+    config = JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return map; // no config or unreadable: no categories, not an error.
+  }
+  const scopes = config?.preferences?.epitaxyPrefs?.['dframe-group-scopes'];
+  if (!scopes || typeof scopes !== 'object') return map;
+  for (const scope of Object.values(scopes)) {
+    const names = new Map();
+    for (const group of scope?.groups ?? []) {
+      if (group?.id && typeof group.name === 'string' && group.name !== '') {
+        names.set(group.id, group.name);
+      }
+    }
+    for (const [key, groupId] of Object.entries(scope?.assignments ?? {})) {
+      if (!key.startsWith('code:')) continue;
+      const name = names.get(groupId);
+      if (name) map.set(key.slice('code:'.length), name);
+    }
+  }
+  return map;
+}
+
+export function readRecords(dir = SESSIONS_DIR, appDir = APP_SESSIONS_DIR, configPath = APP_CONFIG) {
   const map = new Map();
   let names;
   try {
@@ -102,6 +140,8 @@ export function readRecords(dir = SESSIONS_DIR, appDir = APP_SESSIONS_DIR) {
   } catch {
     return map; // no sessions dir: nothing to link, not an error.
   }
+
+  const categories = loadCategoryMap(configPath);
 
   for (const name of names) {
     if (!name.endsWith('.json')) continue;
@@ -115,8 +155,10 @@ export function readRecords(dir = SESSIONS_DIR, appDir = APP_SESSIONS_DIR) {
       const startedAt = Number.isFinite(record.startedAt) ? record.startedAt : null;
       const origin = originLabel(record);
       const group = appGroupLabel(record.hostSessionId, appDir);
-      if (bridgeSessionId || title || startedAt || origin || group) {
-        map.set(record.sessionId, { bridgeSessionId, title, startedAt, origin, group });
+      const category = (typeof record.hostSessionId === 'string'
+        ? categories.get(record.hostSessionId) : null) ?? null;
+      if (bridgeSessionId || title || startedAt || origin || group || category) {
+        map.set(record.sessionId, { bridgeSessionId, title, startedAt, origin, group, category });
       }
     } catch {
       // One bad file must not lose the rest.
@@ -176,6 +218,11 @@ export function originFor(sessionId, now = Date.now()) {
 /** The desktop app's group (origin folder name) for this session, or null. */
 export function appGroupFor(sessionId, now = Date.now()) {
   return recordFor(sessionId, now)?.group ?? null;
+}
+
+/** The user's sidebar group name (e.g. "DEA") for this session, or null. */
+export function categoryFor(sessionId, now = Date.now()) {
+  return recordFor(sessionId, now)?.category ?? null;
 }
 
 /** True when a process with this pid exists (EPERM still means it is alive). */

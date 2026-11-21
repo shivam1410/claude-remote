@@ -27,6 +27,9 @@ const val PAYLOAD_VERSION = 1
 data class SessionPayload(
     val sessionId: String,
     val project: String = "",
+    // The user's desktop sidebar group (e.g. "DEA"); empty when unfiled. The
+    // default grouping on Home. `project` (the folder) is shown as a chip.
+    val category: String = "",
     val branch: String = "",
     // Claude Code's own name for the session; empty when the session is unnamed.
     val title: String = "",

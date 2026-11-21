@@ -60,6 +60,7 @@ fun BridgeApp(initialSessionId: String?) {
     var busy by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(initialSessionId) }
     var sortMode by remember { mutableStateOf(SessionSort.load(context)) }
+    var groupMode by remember { mutableStateOf(SessionSort.loadGroup(context)) }
 
     val configured = remember { Auth.configured(context) }
     var photoUrl by remember { mutableStateOf(Auth.photoUrl(context)) }
@@ -195,6 +196,8 @@ fun BridgeApp(initialSessionId: String?) {
             loading = loading,
             sortMode = sortMode,
             onSortChange = { sortMode = it; SessionSort.save(context, it) },
+            groupMode = groupMode,
+            onGroupChange = { groupMode = it; SessionSort.saveGroup(context, it) },
             projects = sessions.map { it.project }.filter { it.isNotEmpty() }.distinct().sorted(),
             onStartSession = { prompt, project ->
                 scope.launch { runCatching { repo.startSession(prompt, project) } }

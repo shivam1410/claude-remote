@@ -3,12 +3,20 @@ package dev.claudebridge
 import android.content.Context
 import androidx.core.content.edit
 
-/** How the Home list orders repo groups. A per-viewer UI preference only. */
+/** How the Home list orders groups. A per-viewer UI preference only. */
 enum class SortMode(val label: String) {
     NAME_ASC("Name A–Z"),
     NAME_DESC("Name Z–A"),
     RECENT_DESC("Recently updated"),
     RECENT_ASC("Oldest first"),
+}
+
+/** What the Home list groups sessions by. A per-viewer UI preference only. */
+enum class GroupMode(val label: String) {
+    // The user's desktop sidebar group (DEA, Enhancement, …).
+    CATEGORY("Group by category"),
+    // The session's project folder.
+    FOLDER("Group by folder"),
 }
 
 /**
@@ -19,6 +27,7 @@ enum class SortMode(val label: String) {
 object SessionSort {
     private const val PREFS = "claude-bridge"
     private const val KEY = "sortMode"
+    private const val GROUP_KEY = "groupMode"
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -30,20 +39,36 @@ object SessionSort {
         prefs(context).edit { putString(KEY, mode.name) }
     }
 
+    fun loadGroup(context: Context): GroupMode =
+        runCatching { GroupMode.valueOf(prefs(context).getString(GROUP_KEY, "") ?: "") }
+            .getOrDefault(GroupMode.CATEGORY)
+
+    fun saveGroup(context: Context, mode: GroupMode) {
+        prefs(context).edit { putString(GROUP_KEY, mode.name) }
+    }
+
+    // The bucket a session falls in: its category, or its folder. The fallback
+    // label names the sessions that have no value for the chosen key.
+    private fun keyOf(session: SessionPayload, group: GroupMode): String = when (group) {
+        GroupMode.CATEGORY -> session.category.ifEmpty { "Ungrouped" }
+        GroupMode.FOLDER -> session.project.ifEmpty { "unknown" }
+    }
+
     /**
-     * Group the sessions by project and order the groups per [mode]. Within a
-     * group the newest session is always first; [mode] only sets the order of
-     * the groups themselves.
+     * Bucket the sessions by [group] and order the buckets per [sort]. Within a
+     * bucket the newest session is always first; [sort] only sets the order of
+     * the buckets themselves.
      */
     fun group(
         sessions: List<SessionPayload>,
-        mode: SortMode,
+        sort: SortMode,
+        group: GroupMode = GroupMode.CATEGORY,
     ): List<Pair<String, List<SessionPayload>>> {
         val groups = sessions
-            .groupBy { it.project.ifEmpty { "unknown" } }
+            .groupBy { keyOf(it, group) }
             .mapValues { (_, g) -> g.sortedByDescending { it.ts } }
         val entries = groups.entries.toList()
-        val ordered = when (mode) {
+        val ordered = when (sort) {
             SortMode.NAME_ASC -> entries.sortedBy { it.key.lowercase() }
             SortMode.NAME_DESC -> entries.sortedByDescending { it.key.lowercase() }
             SortMode.RECENT_DESC ->

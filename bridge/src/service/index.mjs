@@ -24,7 +24,7 @@ import * as db from './db.mjs';
 import * as fcm from './fcm.mjs';
 import * as keychain from './keychain.mjs';
 import { decode, classify, deliver, liveStatus, halt } from './inject.mjs';
-import { deepLinkFor, titleFor, startedAtFor, originFor, appGroupFor, liveSessionIds } from './bridgeLink.mjs';
+import { deepLinkFor, titleFor, startedAtFor, originFor, appGroupFor, categoryFor, liveSessionIds } from './bridgeLink.mjs';
 import { prFor } from './pr.mjs';
 import { decode as decodeCommand, runStart } from './commands.mjs';
 import { DEFAULT_TIMEOUT_MS } from '../core/approval.mjs';
@@ -98,10 +98,12 @@ function payloadFor(session) {
   const pr = branch ? prFor(workspaceRoot(session.cwd) ?? session.cwd, branch) : null;
   return {
     sessionId: session.sessionId,
-    // Prefer the desktop app's own grouping (the session's origin folder) so the
-    // phone's groups match the app; fall back to the cwd-derived label when the
-    // app has no record of it (e.g. a CLI session).
+    // The session's origin folder (matches the desktop app's folder), shown as a
+    // tag and used for "group by folder"; cwd-derived fallback for a CLI session.
     project: scrub(appGroupFor(session.sessionId) ?? session.project),
+    // The user's sidebar group (e.g. "DEA"), the default grouping on the phone.
+    // Empty when the session is not filed under a group.
+    category: scrub(categoryFor(session.sessionId) ?? ''),
     branch: scrub(branch),
     // Claude Code's own name for the session. Scrubbed: the auto-name can echo
     // work content (e.g. "fix auth bug in billing"). Empty when unnamed.
@@ -588,6 +590,7 @@ export async function refreshSessions(config, key, deps = {}) {
     nameFor = titleFor,
     launchedFrom = originFor,
     groupFor = appGroupFor,
+    categoryOf = categoryFor,
   } = deps;
 
   const nodes = await listSessions(config);
@@ -611,13 +614,15 @@ export async function refreshSessions(config, key, deps = {}) {
     const title = scrub(nameFor(sessionId) ?? '');
     const origin = launchedFrom(sessionId) ?? '';
     const group = scrub(groupFor(sessionId) ?? '');
+    const category = scrub(categoryOf(sessionId) ?? '');
     // Only the arrival of a value is interesting here. Removal (a session that
     // left Remote Control) is rare and not worth a write every pass.
     const gainedUrl = url && url !== payload.openUrl;
     const gainedTitle = title !== '' && title !== payload.title;
     const gainedOrigin = origin !== '' && origin !== payload.origin;
     const gainedGroup = group !== '' && group !== payload.project;
-    if (!gainedUrl && !gainedTitle && !gainedOrigin && !gainedGroup) continue;
+    const gainedCategory = category !== '' && category !== payload.category;
+    if (!gainedUrl && !gainedTitle && !gainedOrigin && !gainedGroup && !gainedCategory) continue;
 
     const next = {
       ...payload,
@@ -625,6 +630,7 @@ export async function refreshSessions(config, key, deps = {}) {
       ...(gainedTitle && { title }),
       ...(gainedOrigin && { origin }),
       ...(gainedGroup && { project: group }),
+      ...(gainedCategory && { category }),
     };
     await putSession(config, sessionId, {
       v: PAYLOAD_VERSION,

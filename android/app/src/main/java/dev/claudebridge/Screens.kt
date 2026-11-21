@@ -241,14 +241,32 @@ private fun NewSessionDialog(
 }
 
 @Composable
-private fun SortMenu(sortMode: SortMode, onSortChange: (SortMode) -> Unit) {
+private fun SortMenu(
+    sortMode: SortMode,
+    onSortChange: (SortMode) -> Unit,
+    groupMode: GroupMode,
+    onGroupChange: (GroupMode) -> Unit,
+) {
     var open by remember { mutableStateOf(false) }
 
     IconButton(onClick = { open = true }) {
-        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort sessions")
+        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort and group sessions")
     }
 
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        // How sessions are bucketed, then how the buckets are ordered.
+        for (mode in GroupMode.entries) {
+            DropdownMenuItem(
+                text = { Text(mode.label) },
+                leadingIcon = {
+                    if (mode == groupMode) {
+                        Icon(Icons.Filled.Check, contentDescription = null)
+                    }
+                },
+                onClick = { open = false; onGroupChange(mode) },
+            )
+        }
+        HorizontalDivider()
         for (mode in SortMode.entries) {
             DropdownMenuItem(
                 text = { Text(mode.label) },
@@ -365,6 +383,8 @@ fun SessionListScreen(
     loading: Boolean,
     sortMode: SortMode,
     onSortChange: (SortMode) -> Unit,
+    groupMode: GroupMode,
+    onGroupChange: (GroupMode) -> Unit,
     projects: List<String>,
     onStartSession: (String, String) -> Unit,
     onOpen: (SessionPayload) -> Unit,
@@ -401,8 +421,8 @@ fun SessionListScreen(
                     }
                 },
                 actions = {
-                    // Sort control sits left of the account avatar.
-                    SortMenu(sortMode, onSortChange)
+                    // Sort/group control sits left of the account avatar.
+                    SortMenu(sortMode, onSortChange, groupMode, onGroupChange)
                     AccountMenu(
                         email = accountEmail,
                         photoUrl = accountPhotoUrl,
@@ -424,7 +444,9 @@ fun SessionListScreen(
             }
         },
     ) { padding ->
-        val grouped = remember(sessions, sortMode) { SessionSort.group(sessions, sortMode) }
+        val grouped = remember(sessions, sortMode, groupMode) {
+            SessionSort.group(sessions, sortMode, groupMode)
+        }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
@@ -545,16 +567,25 @@ private fun SessionCard(session: SessionPayload, onClick: () -> Unit) {
                 }
                 StateTag(session.state)
             }
-            if (session.ts > 0) {
+            // Folder tag plus last activity on one muted line. The folder helps
+            // when the list is grouped by category rather than by folder.
+            val meta = buildList {
+                if (session.project.isNotEmpty()) add("📁 ${session.project}")
+                if (session.ts > 0) {
+                    // Relative ("5 min ago"); native, re-reads on each recomposition.
+                    add(
+                        DateUtils.getRelativeTimeSpanString(
+                            session.ts,
+                            System.currentTimeMillis(),
+                            DateUtils.MINUTE_IN_MILLIS,
+                        ).toString(),
+                    )
+                }
+            }
+            if (meta.isNotEmpty()) {
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    // Last activity, relative ("5 min ago"). Native, re-reads on
-                    // each recomposition — close enough for a status list.
-                    DateUtils.getRelativeTimeSpanString(
-                        session.ts,
-                        System.currentTimeMillis(),
-                        DateUtils.MINUTE_IN_MILLIS,
-                    ).toString(),
+                    meta.joinToString(" · "),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -669,6 +700,8 @@ fun SessionDetailScreen(session: SessionPayload, onBack: () -> Unit) {
 private fun SessionChips(session: SessionPayload) {
     val context = LocalContext.current
     val chips = buildList {
+        // The project folder, shown as a tag (grouping may be by category).
+        if (session.project.isNotEmpty()) add("📁 ${session.project}")
         when (session.origin) {
             "bg" -> add("background")
             "cli" -> add("terminal")
