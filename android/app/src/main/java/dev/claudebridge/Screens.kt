@@ -2,6 +2,7 @@ package dev.claudebridge
 
 import android.content.Intent
 import android.net.Uri
+import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -422,6 +423,20 @@ private fun SessionCard(session: SessionPayload, onClick: () -> Unit) {
                 )
                 Spacer(Modifier.width(8.dp))
                 StateTag(session.state)
+            }
+            if (session.ts > 0) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    // Last activity, relative ("5 min ago"). Native, re-reads on
+                    // each recomposition — close enough for a status list.
+                    DateUtils.getRelativeTimeSpanString(
+                        session.ts,
+                        System.currentTimeMillis(),
+                        DateUtils.MINUTE_IN_MILLIS,
+                    ).toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (session.summary.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))
