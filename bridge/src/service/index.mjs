@@ -26,6 +26,7 @@ import * as keychain from './keychain.mjs';
 import { decode, classify, deliver, liveStatus, halt } from './inject.mjs';
 import { deepLinkFor, titleFor, startedAtFor, liveSessionIds } from './bridgeLink.mjs';
 import { prFor } from './pr.mjs';
+import { decode as decodeCommand, runStart } from './commands.mjs';
 import { DEFAULT_TIMEOUT_MS } from '../core/approval.mjs';
 
 const CURSOR_PATH = join(CONFIG_DIR, 'cursor.json');
@@ -360,6 +361,58 @@ async function noteHold(config, key, node, pushId, putReplyError, message) {
   }
 }
 
+/**
+ * The workspace root a project label names, from the roots the bridge has seen,
+ * or null. The cwd a command runs in comes from here, never from the phone, so
+ * a command can only start a session in a known workspace. The label is matched
+ * after scrub, since that is the form the phone received.
+ */
+function resolveProjectRoot(project) {
+  const roots = new Set(sessionCwds.values());
+  if (!project) {
+    // No project named: only safe when there is exactly one known root.
+    return roots.size === 1 ? [...roots][0] : null;
+  }
+  for (const root of roots) {
+    if (scrub(projectLabel(root)) === project) return root;
+  }
+  return null;
+}
+
+/**
+ * Act on commands the phone queued. Today the only action is "start": run
+ * `claude --bg <prompt>` in a known workspace. Every command is deleted after
+ * one attempt — a command we cannot act on must not be retried forever.
+ */
+export async function deliverCommands(config, key, deps = {}) {
+  const {
+    listCommands = db.listCommands,
+    deleteCommand = db.deleteCommand,
+    start = runStart,
+    resolveRoot = resolveProjectRoot,
+  } = deps;
+
+  const pending = await listCommands(config);
+  if (!pending) return 0;
+
+  let started = 0;
+  for (const [commandId, node] of Object.entries(pending)) {
+    const cmd = decodeCommand(key, node);
+    if (cmd) {
+      const root = resolveRoot(cmd.project);
+      if (!root) {
+        console.log(`command ${commandId}: unknown project ${JSON.stringify(cmd.project)}`);
+      } else if (await start(root, cmd.prompt)) {
+        started += 1;
+      } else {
+        console.log(`command ${commandId}: claude --bg failed in ${root}`);
+      }
+    }
+    await deleteCommand(config, commandId);
+  }
+  return started;
+}
+
 /** Build the encrypted node for one pending tool approval. */
 function approvalNode(key, record) {
   const payload = {
@@ -506,6 +559,7 @@ export async function tick(config, key, deps = {}) {
     publish: runPublish = publish,
     relayDecisions: runRelay = relayDecisions,
     deliverReplies: runDeliver = deliverReplies,
+    deliverCommands: runCommands = deliverCommands,
     prunePushes: runPrune = prunePushes,
     pruneStaleSessions: runSweep = pruneStaleSessions,
   } = deps;
@@ -521,6 +575,7 @@ export async function tick(config, key, deps = {}) {
     ['publish', async () => { touched = await runPublish(config, key); }],
     ['relayDecisions', () => runRelay(config, key)],
     ['deliverReplies', () => runDeliver(config, key)],
+    ['deliverCommands', () => runCommands(config, key)],
     ['prunePushes', () => runPrune(config)],
     ['pruneStaleSessions', async () => {
       // Throttled: the sweep reads the sessions directory and checks pids, far

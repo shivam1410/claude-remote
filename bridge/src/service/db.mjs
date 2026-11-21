@@ -62,6 +62,16 @@ export function deleteReply(config, pushId) {
   return request(config, 'DELETE', `/replies/${pushId}`);
 }
 
+/** Read every pending command (e.g. start a new session). */
+export function listCommands(config) {
+  return request(config, 'GET', '/commands');
+}
+
+/** Remove a command once it has been acted on. */
+export function deleteCommand(config, commandId) {
+  return request(config, 'DELETE', `/commands/${commandId}`);
+}
+
 /** Publish one pending tool-approval request. */
 export function putApproval(config, requestId, node) {
   return request(config, 'PUT', `/approvals/${requestId}`, node);

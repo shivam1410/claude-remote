@@ -16,6 +16,7 @@ test('a failing publish still lets replies and decisions through', async () => {
       publish: () => { throw new Error('401 Permission denied'); },
       relayDecisions: () => { ran.push('relay'); },
       deliverReplies: () => { ran.push('deliver'); },
+      deliverCommands: async () => 0,
       prunePushes: async () => 0,
       pruneStaleSessions: async () => 0,
     }),
@@ -30,6 +31,7 @@ test('every stage failing is reported in one error, not just the first', async (
       publish: () => { throw new Error('a'); },
       relayDecisions: () => { throw new Error('b'); },
       deliverReplies: () => { throw new Error('c'); },
+      deliverCommands: async () => 0,
       prunePushes: async () => 0,
       pruneStaleSessions: async () => 0,
     }),
@@ -44,6 +46,7 @@ test('a clean pass returns what publish touched', async () => {
     publish: async () => 4,
     relayDecisions: async () => {},
     deliverReplies: async () => {},
+    deliverCommands: async () => 0,
     prunePushes: async () => 0,
     pruneStaleSessions: async () => 0,
   });

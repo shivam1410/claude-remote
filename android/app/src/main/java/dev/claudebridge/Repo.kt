@@ -60,6 +60,22 @@ class Repo(private val uid: String, private val key: SecretKey, databaseUrl: Str
             .await()
     }
 
+    /**
+     * Ask the Mac to start a new background session in [project] with [prompt].
+     * Sealed like everything else; the node wrapper carries the version and time
+     * the rules validate. The Mac resolves [project] to a known workspace — an
+     * unknown one is ignored there, never run as a path.
+     */
+    suspend fun startSession(prompt: String, project: String) {
+        val payload = CommandPayload(prompt = prompt, project = project)
+        val node = mapOf(
+            "v" to PAYLOAD_VERSION,
+            "createdAt" to System.currentTimeMillis(),
+            "blob" to Crypto.seal(key, BridgeJson.encodeToString(payload)),
+        )
+        root.child("commands").push().setValue(node).await()
+    }
+
     /** One child-list path, re-emitted on every change, decrypted on arrival. */
     private fun <T> stream(path: String, map: (DataSnapshot) -> T?): Flow<List<T>> = callbackFlow {
         val ref = root.child(path)

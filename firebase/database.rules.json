@@ -14,6 +14,11 @@
             ".validate": "newData.hasChildren(['v', 'createdAt', 'blob']) && newData.child('blob').isString() && newData.child('blob').val().length < 4096"
           }
         },
+        "commands": {
+          "$commandId": {
+            ".validate": "newData.hasChildren(['v', 'createdAt', 'blob']) && newData.child('blob').isString() && newData.child('blob').val().length < 4096"
+          }
+        },
         "approvals": {
           "$requestId": {
             ".validate": "newData.hasChildren(['v', 'createdAt', 'blob']) && newData.child('blob').isString() && newData.child('blob').val().length < 4096"

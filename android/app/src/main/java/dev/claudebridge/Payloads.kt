@@ -51,6 +51,19 @@ data class SessionPayload(
     val needsAttention: Boolean get() = state == "waiting_input" || state == "waiting_approval"
 }
 
+/**
+ * What this app seals into /u/{uid}/commands/{id} to ask the Mac to act. The
+ * node wrapper carries v/createdAt/blob; this is the blob. Only "start" today:
+ * run a new background session in [project] with [prompt].
+ */
+@Serializable
+data class CommandPayload(
+    @SerialName("v") val version: Int = PAYLOAD_VERSION,
+    val action: String = "start",
+    val prompt: String,
+    val project: String = "",
+)
+
 /** What this app seals into /u/{uid}/replies/{id}. */
 @Serializable
 data class ReplyPayload(

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,7 +47,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -181,6 +184,59 @@ fun AccountMenu(
 }
 
 @Composable
+private fun NewSessionDialog(
+    projects: List<String>,
+    onDismiss: () -> Unit,
+    onStart: (String, String) -> Unit,
+) {
+    var prompt by remember { mutableStateOf("") }
+    var project by remember { mutableStateOf(projects.firstOrNull() ?: "") }
+    var pickerOpen by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New session") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Starts a background session on the Mac. It shows here and, " +
+                        "with Remote Control on, in Claude — not in the desktop app.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = prompt,
+                    onValueChange = { prompt = it },
+                    label = { Text("Prompt") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                )
+                Box {
+                    OutlinedButton(onClick = { pickerOpen = true }) {
+                        Text(project.ifEmpty { "Pick a project" })
+                    }
+                    DropdownMenu(expanded = pickerOpen, onDismissRequest = { pickerOpen = false }) {
+                        for (p in projects) {
+                            DropdownMenuItem(
+                                text = { Text(p) },
+                                onClick = { project = p; pickerOpen = false },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onStart(prompt.trim(), project) },
+                enabled = prompt.isNotBlank() && project.isNotEmpty(),
+            ) { Text("Start") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
 private fun SortMenu(sortMode: SortMode, onSortChange: (SortMode) -> Unit) {
     var open by remember { mutableStateOf(false) }
 
@@ -305,6 +361,8 @@ fun SessionListScreen(
     loading: Boolean,
     sortMode: SortMode,
     onSortChange: (SortMode) -> Unit,
+    projects: List<String>,
+    onStartSession: (String, String) -> Unit,
     onOpen: (SessionPayload) -> Unit,
     onDecide: (ApprovalPayload, Boolean) -> Unit,
     onUnpair: () -> Unit,
@@ -314,6 +372,18 @@ fun SessionListScreen(
     accountEmail: String?,
     accountPhotoUrl: String?,
 ) {
+    var showNew by remember { mutableStateOf(false) }
+    if (showNew) {
+        NewSessionDialog(
+            projects = projects,
+            onDismiss = { showNew = false },
+            onStart = { prompt, project ->
+                showNew = false
+                onStartSession(prompt, project)
+            },
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -339,6 +409,15 @@ fun SessionListScreen(
                     )
                 },
             )
+        },
+        // A new session can only start in a project the Mac already knows, so the
+        // action appears only once at least one is listed.
+        floatingActionButton = {
+            if (projects.isNotEmpty()) {
+                FloatingActionButton(onClick = { showNew = true }) {
+                    Icon(Icons.Filled.Add, contentDescription = "New session")
+                }
+            }
         },
     ) { padding ->
         val grouped = remember(sessions, sortMode) { SessionSort.group(sessions, sortMode) }

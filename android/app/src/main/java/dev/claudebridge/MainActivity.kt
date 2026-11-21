@@ -195,6 +195,10 @@ fun BridgeApp(initialSessionId: String?) {
             loading = loading,
             sortMode = sortMode,
             onSortChange = { sortMode = it; SessionSort.save(context, it) },
+            projects = sessions.map { it.project }.filter { it.isNotEmpty() }.distinct().sorted(),
+            onStartSession = { prompt, project ->
+                scope.launch { runCatching { repo.startSession(prompt, project) } }
+            },
             onOpen = { selected = it.sessionId },
             onDecide = { approval, allow ->
                 scope.launch { runCatching { repo.decide(approval.requestId, allow) } }
