@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tick, prunePushes, pruneStaleSessions, refreshSessions } from '../src/service/index.mjs';
+import { tick, prunePushes, pruneStaleSessions, refreshSessions, shouldPush } from '../src/service/index.mjs';
 import { seal, open } from '../src/core/crypto.mjs';
 
 const config = { databaseUrl: 'https://example.invalid' };
@@ -55,6 +55,19 @@ test('a clean pass returns what publish touched', async () => {
     refreshSessions: async () => 0,
   });
   assert.equal(touched, 4);
+});
+
+test('shouldPush holds every push while paused, and otherwise only new states', () => {
+  const act = { state: 'waiting_input', ts: 200 };
+  // Paused from the laptop: nothing pushes, however new.
+  assert.equal(shouldPush(true, act, 0), false);
+  assert.equal(shouldPush(true, act, undefined), false);
+  // Not paused: a newer actionable ts pushes, an already-pushed one does not.
+  assert.equal(shouldPush(false, act, 100), true);
+  assert.equal(shouldPush(false, act, 200), false);
+  assert.equal(shouldPush(false, act, undefined), true);
+  // No actionable occurrence in the batch: nothing to push.
+  assert.equal(shouldPush(false, undefined, 0), false);
 });
 
 test('pruneStaleSessions drops a dead, stale session but keeps live and fresh ones', async () => {

@@ -11,7 +11,7 @@
 // running, sessions are unaffected and the spool simply grows until it starts.
 import { statSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { mkdirSync, writeFileSync, utimesSync, closeSync, openSync } from 'node:fs';
+import { mkdirSync, writeFileSync, utimesSync, closeSync, openSync, existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { load, SPOOL_DIR, CONFIG_DIR } from './config.mjs';
 import { drain, readCursor, writeCursor } from './spool.mjs';
@@ -35,6 +35,14 @@ import { DEFAULT_TIMEOUT_MS } from '../core/approval.mjs';
 const CURSOR_PATH = join(CONFIG_DIR, 'cursor.json');
 const DECISIONS_DIR = join(CONFIG_DIR, 'decisions');
 const HEARTBEAT_PATH = join(CONFIG_DIR, 'heartbeat');
+// A glanceable status the menubar reads; rewritten every tick. Status only, no
+// secrets — a uid and a live session count, the same facts the phone already
+// holds.
+const STATUS_PATH = join(CONFIG_DIR, 'status.json');
+// Presence of this file means "I am at the laptop": publish still updates the
+// session list, but suppresses the FCM push so the phone stays quiet. The
+// menubar creates and removes it.
+const PAUSED_PATH = join(CONFIG_DIR, 'paused');
 // How long a request may sit unanswered before the service prunes it. The hook
 // has already fallen back to `ask` by then, so a later answer has nowhere to go.
 const APPROVAL_TTL_MS = DEFAULT_TIMEOUT_MS + 30_000;
@@ -225,6 +233,15 @@ export function pickActionable(records) {
 export const sessionCwds = new Map();
 
 /** Drain the spool and publish. Returns the number of sessions touched. */
+/**
+ * Whether an actionable occurrence should raise a push now. False while paused
+ * (the laptop is in use) and for a state already pushed — the ts only advances
+ * on a new Stop/Notification, so a lingering state never repeats.
+ */
+export function shouldPush(paused, act, lastTs) {
+  return !paused && !!act && act.ts > (lastTs ?? 0);
+}
+
 export async function publish(config, key) {
   const cursor = readCursor(CURSOR_PATH);
   const { records, cursor: nextCursor } = drain(SPOOL_DIR, cursor);
@@ -239,12 +256,17 @@ export async function publish(config, key) {
   const sessions = fold(records);
 
   const actionable = pickActionable(records);
+  // Paused from the laptop: keep the list current but hold the push. Read once
+  // per batch. lastPushedTs is left untouched while paused, so the first batch
+  // after unpausing sends one catch-up push per still-waiting session rather
+  // than a burst of everything that happened meanwhile.
+  const paused = existsSync(PAUSED_PATH);
 
   for (const session of sessions) {
     const act = actionable.get(session.sessionId);
     // Push once per actionable occurrence: a new Stop/Notification has a newer
     // ts; a lingering state produces no new record, so no repeat.
-    if (act && act.ts > (lastPushedTs.get(session.sessionId) ?? 0)) {
+    if (shouldPush(paused, act, lastPushedTs.get(session.sessionId))) {
       lastPushedTs.set(session.sessionId, act.ts);
       await pushNow(config, seal(key, payloadFor({ ...session, state: act.state })));
     }
@@ -741,7 +763,26 @@ async function main() {
       // service, and nothing is lost because the cursor did not advance.
       console.error(`tick failed: ${error.message}`);
     }
+    writeStatus(uid);
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+  }
+}
+
+/**
+ * Write the glanceable status the menubar reads. Best-effort: a failure here
+ * must never take the service down, so it is swallowed. `at` doubles as the
+ * running signal — the menubar treats a stale timestamp as "stopped".
+ */
+function writeStatus(uid, path = STATUS_PATH) {
+  try {
+    writeFileSync(path, JSON.stringify({
+      at: Date.now(),
+      uid,
+      sessions: liveSessionIds().size,
+      paused: existsSync(PAUSED_PATH),
+    }), { mode: 0o600 });
+  } catch {
+    // The service runs fine without a status file; the menubar just shows stale.
   }
 }
 

@@ -98,3 +98,6 @@ tmp/
 
 # AW tooling scratch state, rewritten constantly
 .aw_docs/cache/
+
+# compiled menubar binary
+macos/claude-bridge-menubar
