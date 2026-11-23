@@ -12,8 +12,20 @@ import androidx.core.content.edit
 object Mutes {
     private const val PREFS = "claude-bridge"
     private const val KEY = "mutedSessions"
+    private const val KEY_ALL = "notificationsOn"
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    /** Master switch for all notifications on this phone. On by default. */
+    fun notificationsOn(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_ALL, true)
+
+    /** Flip the master switch and return the new state. */
+    fun toggleAll(context: Context): Boolean {
+        val next = !notificationsOn(context)
+        prefs(context).edit { putBoolean(KEY_ALL, next) }
+        return next
+    }
 
     fun isMuted(context: Context, sessionId: String): Boolean =
         prefs(context).getStringSet(KEY, emptySet())?.contains(sessionId) == true

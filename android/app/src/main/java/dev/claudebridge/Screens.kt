@@ -385,6 +385,8 @@ fun SessionListScreen(
     onSortChange: (SortMode) -> Unit,
     groupMode: GroupMode,
     onGroupChange: (GroupMode) -> Unit,
+    notificationsOn: Boolean,
+    onToggleNotifications: () -> Unit,
     projects: List<String>,
     onStartSession: (String, String) -> Unit,
     onOpen: (SessionPayload) -> Unit,
@@ -421,6 +423,14 @@ fun SessionListScreen(
                     }
                 },
                 actions = {
+                    // Master notification switch: silence every push while you
+                    // are at the laptop, without unpairing.
+                    IconButton(onClick = onToggleNotifications) {
+                        Icon(
+                            if (notificationsOn) Icons.Filled.Notifications else Icons.Filled.NotificationsOff,
+                            contentDescription = if (notificationsOn) "Notifications on" else "Notifications off",
+                        )
+                    }
                     // Sort/group control sits left of the account avatar.
                     SortMenu(sortMode, onSortChange, groupMode, onGroupChange)
                     AccountMenu(

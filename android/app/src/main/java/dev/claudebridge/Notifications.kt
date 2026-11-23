@@ -26,8 +26,10 @@ object Notifications {
             return
         }
 
-        // Muted on this phone: the session still updates in the list, it just
-        // does not raise a notification.
+        // Master switch off, or this session muted: the list still updates on
+        // open, but no notification is raised. Pure phone-side — the push is
+        // data-only, so nothing about this leaves the device.
+        if (!Mutes.notificationsOn(context)) return
         if (Mutes.isMuted(context, session.sessionId)) return
 
         val name = session.title.ifEmpty { session.project }
